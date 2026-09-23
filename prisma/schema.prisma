@@ -1,0 +1,53 @@
+// Desi Cal AI — Prisma schema (Day 1)
+// Dev database: SQLite (DATABASE_URL="file:./dev.db").
+// DAY 14: switch `provider` to "postgresql" and point DATABASE_URL at Neon.
+// The schema deliberately uses only cross-compatible features (cuid(), Float,
+// DateTime, no SQLite-only tricks) so the Day-14 migration is a one-line change.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String      @id @default(cuid())
+  email     String      @unique
+  name      String?
+  createdAt DateTime    @default(now())
+  entries   FoodEntry[]
+}
+
+model FoodEntry {
+  id           String   @id @default(cuid())
+  userId       String? // NULL until Auth.js lands on Day 2
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dishName     String
+  dishNameUrdu String?
+  calories     Int
+  protein      Float // grams
+  carbs        Float // grams
+  fat          Float // grams
+  portion      String
+  imagePath    String? // e.g. /uploads/<uuid>.jpg (public/uploads is gitignored)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Reference nutrition data for common desi dishes.
+// Day 1: seeded with 10 dishes. Day 7: expanded to 200+ with search + Urdu names.
+model Dish {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  nameUrdu    String?
+  calories    Int // per serving
+  protein     Float // grams per serving
+  carbs       Float // grams per serving
+  fat         Float // grams per serving
+  servingSize String
+}
