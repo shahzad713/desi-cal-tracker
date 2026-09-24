@@ -52,6 +52,42 @@ uses only cross-compatible features, so on **Day 14** the Postgres move is:
 2. Point `DATABASE_URL` at the Neon connection string
 3. `npx prisma migrate dev`
 
+## Auth (Day 2)
+
+**Auth.js v5** — email/password (bcrypt, cost 12) + Google OAuth. JWT sessions
+(stateless, signed with `AUTH_SECRET` — chosen so the edge middleware can verify
+sessions without a DB round-trip; Prisma can't run on the edge).
+
+- `/signup` — create account (zod-validated, rate-limited per IP)
+- `/login` — sign in with email/password or Google
+- `/profile` — account info + meal count + sign-out
+- `/track`, `/dashboard`, `/profile` are **protected by edge middleware** —
+  anonymous visitors are bounced to `/login`
+
+Env vars (see `.env.example`):
+
+```bash
+AUTH_SECRET=...            # required — openssl rand -base64 32
+GOOGLE_CLIENT_ID=...       # optional until set — credentials login works without it
+GOOGLE_CLIENT_SECRET=...
+AUTH_TRUST_HOST=true       # local `next start` only; on Vercel set in dashboard (Day 14)
+```
+
+### Security model
+
+- **Ownership enforced everywhere**: every `FoodEntry` query is scoped by
+  `userId` from the server-verified session. `deleteEntry` uses
+  `deleteMany({ where: { id, userId } })` so a forged id deletes nothing.
+- **Server-side validation**: zod schemas on all server actions; upload paths
+  must match `/uploads/<uuid>.<ext>` — client-invented paths are rejected.
+- **Upload validation**: MIME allowlist (jpg/png/webp) **plus magic-byte check**
+  — extension is derived from validated MIME, never the client filename.
+- **No info leaks**: wrong email and wrong password return the identical error;
+  signup won't confirm whether an email is registered.
+- **Rate limits**: login 10 attempts / 10 min per IP; signup 5 / hour per IP.
+- **Security headers**: X-Frame-Options, X-Content-Type-Options,
+  Referrer-Policy, Permissions-Policy, HSTS (see `next.config.mjs`).
+
 ## Uploads
 
 Photos are stored under `public/uploads/` (gitignored) and the path is saved
@@ -59,7 +95,7 @@ on each `FoodEntry`. Served statically by Next.js.
 
 ## Roadmap
 
-See [PROGRESS.md](./PROGRESS.md) — 15-day build plan, Day 1 ✅ done.
+See [PROGRESS.md](./PROGRESS.md) — 15-day build plan, Day 2 ✅ done.
 
 ## ⚠️ Build-environment notes (this server)
 
