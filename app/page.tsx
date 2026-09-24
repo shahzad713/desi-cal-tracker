@@ -49,7 +49,7 @@ export default function Home() {
           </Link>
         </div>
         <p className="mt-4 text-xs text-gray-400">
-          Free during beta · No signup needed yet
+          Free during beta · Your meals stay private to your account
         </p>
       </section>
 

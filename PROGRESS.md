@@ -15,7 +15,22 @@
 - [x] README, `.env.example`, `.gitignore`, `npm run build` green
 - [x] Initial commit
 
-## ⏳ Day 2 — Auth.js (credentials + Google) + protected routes
+## ✅ Day 2 — Auth.js + protected routes (2026-09-24)
+
+- [x] Auth.js v5: Credentials (email/password, bcrypt cost 12) + Google OAuth providers
+- [x] JWT sessions signed with `AUTH_SECRET` (edge-middleware compatible; Prisma can't run on edge)
+- [x] Prisma schema: `Account`, `Session`, `VerificationToken` models + `passwordHash` on `User` (migration `auth`)
+- [x] Edge middleware: `/track`, `/dashboard`, `/profile` require sign-in → bounce to `/login`
+- [x] Pages: `/login` (credentials + Google), `/signup` (zod-validated, rate-limited), `/profile` (stats + sign-out)
+- [x] Session-aware nav (account chip + sign-out when signed in)
+- [x] SECURITY: every `FoodEntry` query scoped by session `userId`; `deleteEntry` uses `deleteMany({id, userId})` (forged ids delete nothing)
+- [x] SECURITY: zod validation on all actions; upload imagePath must match `/uploads/<uuid>.<ext>`
+- [x] SECURITY: upload magic-byte check (JPEG/PNG/WebP) + MIME allowlist; extension derived from validated MIME, never client filename
+- [x] SECURITY: no info leak on bad login (same error for wrong email/password); signup won't confirm registered emails
+- [x] SECURITY: rate limits — login 10/10min/IP, signup 5/hour/IP (`lib/rateLimit.ts`)
+- [x] SECURITY: headers — X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, HSTS (`next.config.mjs`)
+- [x] Smoke-tested: anon → 307 to /login; wrong password → generic error; correct password → 200 on protected pages; session carries user.id
+- [x] `npm run build` green
 
 ## ⏳ Day 3 — Real Gemini vision integration (replace `analyzeWithGemini`)
 
