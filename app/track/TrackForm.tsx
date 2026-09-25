@@ -169,7 +169,9 @@ export default function TrackForm() {
             {saved ? "Saved ✓" : isPending ? "Saving…" : "Save to today's log"}
           </button>
           <p className="mt-2 text-center text-xs text-gray-400">
-            Demo mode: analysis is a realistic sample, not real AI (Day 3).
+            {result.mode === "gemini"
+              ? "Analyzed by Gemini AI ✨"
+              : "Demo mode: sample analysis, not real AI — add GEMINI_API_KEY (Day 3)."}
           </p>
         </div>
       )}

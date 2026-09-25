@@ -1,19 +1,24 @@
-// Food analysis layer — Day 1.
+// Food analysis layer — Day 3: real Gemini vision with graceful demo fallback.
 //
 // HOW IT WORKS:
-//   analyzeFoodImage(imageDataUrl) -> FoodAnalysis
-//   - DEMO MODE (default ON, via NEXT_PUBLIC_DEMO_MODE=true): returns realistic
-//     rotating sample analyses for common desi dishes. No API key needed.
-//   - REAL MODE (Day 3): routes to analyzeWithGemini(), which will send the
-//     image to Gemini 1.5 Flash vision and parse the nutrition JSON.
+//   analyzeFoodImage(imageDataUrl) -> { analysis, mode }
+//   - REAL MODE: when NEXT_PUBLIC_DEMO_MODE=false AND GEMINI_API_KEY is set on
+//     the server, the photo goes to Gemini 2.0 Flash vision with a strict
+//     JSON prompt. The model's answer is validated with zod before use —
+//     model output is untrusted input like any other.
+//   - DEMO MODE (fallback): realistic rotating desi-dish samples. Used when
+//     the flag forces it, when no API key is configured, or when the Gemini
+//     call fails (rate limit, outage, timeout). The app never breaks.
 //
-// DAY-3 SWAP INSTRUCTIONS (one-function change):
-//   1. Set NEXT_PUBLIC_DEMO_MODE=false and add GEMINI_API_KEY to .env
-//      (see .env.example).
-//   2. Implement analyzeWithGemini() below using the @google/generative-ai SDK:
-//      send the image + a prompt asking for JSON {dishName, dishNameUrdu,
-//      calories, protein, carbs, fat, portion, confidence}, then parse it.
-//   3. Nothing else changes — callers only use analyzeFoodImage().
+// SECURITY NOTES:
+//   - GEMINI_API_KEY is read ONLY here, on the server. It never reaches the
+//     client (NEXT_PUBLIC_ prefix is absent by design) and never lands in git.
+//   - Rate limiting on the scan path lives in lib/actions.ts (per-user bucket).
+//   - The image MIME is re-validated here against the same allowlist as the
+//     upload path (defense in depth).
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { z } from "zod";
 
 export interface FoodAnalysis {
   dishName: string;
@@ -26,10 +31,19 @@ export interface FoodAnalysis {
   confidence: number; // 0–1
 }
 
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
+export type AnalysisMode = "demo" | "gemini";
 
-// Realistic demo samples for common desi dishes. Each call rotates to the next
-// sample so the demo feels alive across multiple scans.
+export interface FoodAnalysisResult {
+  analysis: FoodAnalysis;
+  mode: AnalysisMode;
+}
+
+// ---------------------------------------------------------------------------
+// Demo mode (also the graceful fallback)
+// ---------------------------------------------------------------------------
+
+const DEMO_MODE_FORCED = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
+
 const DEMO_SAMPLES: FoodAnalysis[] = [
   { dishName: "Chicken Biryani", dishNameUrdu: "چکن بریانی", calories: 650, protein: 28, carbs: 75, fat: 22, portion: "1 plate", confidence: 0.92 },
   { dishName: "Daal + 2 Roti", dishNameUrdu: "دال روٹی", calories: 480, protein: 18, carbs: 70, fat: 12, portion: "1 bowl daal + 2 roti", confidence: 0.89 },
@@ -49,24 +63,145 @@ function demoAnalyze(): FoodAnalysis {
   return { ...sample };
 }
 
-// Day 3: implement with Gemini vision. Signature stays the same.
-async function analyzeWithGemini(imageDataUrl: string): Promise<FoodAnalysis> {
-  void imageDataUrl; // replaced by the real Gemini call on Day 3
-  throw new Error(
-    "Gemini vision integration lands on Day 3. " +
-      "Set NEXT_PUBLIC_DEMO_MODE=true in .env to use demo samples for now."
+// ---------------------------------------------------------------------------
+// Gemini vision
+// ---------------------------------------------------------------------------
+
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_TIMEOUT_MS = 45_000;
+
+// The model's JSON is untrusted input: coerce + bound every field.
+const geminiNutritionSchema = z.object({
+  dishName: z.string().trim().min(1).max(200),
+  dishNameUrdu: z.string().trim().max(200).optional(),
+  calories: z.coerce.number().finite().min(0).max(20000),
+  protein: z.coerce.number().finite().min(0).max(2000),
+  carbs: z.coerce.number().finite().min(0).max(2000),
+  fat: z.coerce.number().finite().min(0).max(2000),
+  portion: z.string().trim().min(1).max(200),
+  confidence: z.coerce.number().min(0).max(1),
+});
+
+const GEMINI_PROMPT = `You are a desi-food nutrition expert. Look at this photo of a meal and identify it.
+
+Respond with ONLY a JSON object (no markdown, no commentary) with these fields:
+- "dishName": English name of the dish, e.g. "Chicken Biryani". If multiple dishes are visible, name the main one.
+- "dishNameUrdu": the dish name in Urdu script, e.g. "چکن بریانی". Omit if unknown.
+- "calories": estimated total kilocalories for the portion shown (number).
+- "protein", "carbs", "fat": estimated grams (numbers).
+- "portion": short description of the portion, e.g. "1 plate", "2 roti + 1 bowl daal".
+- "confidence": your confidence in the identification, 0 to 1.
+
+Base estimates on typical South Asian / Pakistani home cooking. If the photo is not food or you cannot identify the dish, set dishName to "Unknown dish", confidence below 0.4, and give your best conservative estimates.`;
+
+function parseDataUrl(imageDataUrl: string): { mimeType: string; base64: string } {
+  const match = /^data:(image\/(jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(
+    imageDataUrl
   );
+  if (!match) throw new Error("Invalid image data URL.");
+  return { mimeType: match[1], base64: match[3] };
 }
 
-export async function analyzeFoodImage(imageDataUrl: string): Promise<FoodAnalysis> {
-  if (DEMO_MODE) {
+function isRetriable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /429|rate.?limit|quota|5\d\d|timeout|fetch failed|ECONN/i.test(msg);
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Gemini request timed out.")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
+async function callGemini(
+  genAI: GoogleGenerativeAI,
+  mimeType: string,
+  base64: string
+): Promise<FoodAnalysis> {
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    generationConfig: { responseMimeType: "application/json" },
+  });
+
+  const parts = [
+    { text: GEMINI_PROMPT },
+    { inlineData: { mimeType, data: base64 } },
+  ];
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const result = await withTimeout(
+        model.generateContent(parts),
+        GEMINI_TIMEOUT_MS
+      );
+      const text = result.response.text();
+      const parsed = JSON.parse(text);
+      const v = geminiNutritionSchema.safeParse(parsed);
+      if (!v.success) throw new Error("Gemini returned invalid nutrition data.");
+      const d = v.data;
+      return {
+        dishName: d.dishName,
+        dishNameUrdu: d.dishNameUrdu,
+        calories: Math.round(d.calories),
+        protein: Math.round(d.protein * 10) / 10,
+        carbs: Math.round(d.carbs * 10) / 10,
+        fat: Math.round(d.fat * 10) / 10,
+        portion: d.portion,
+        confidence: Math.round(d.confidence * 100) / 100,
+      };
+    } catch (err) {
+      lastError = err;
+      if (!isRetriable(err)) break;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Gemini call failed.");
+}
+
+async function analyzeWithGemini(imageDataUrl: string): Promise<FoodAnalysisResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+  const { mimeType, base64 } = parseDataUrl(imageDataUrl);
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const analysis = await callGemini(genAI, mimeType, base64);
+  return { analysis, mode: "gemini" };
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
+export async function analyzeFoodImage(
+  imageDataUrl: string
+): Promise<FoodAnalysisResult> {
+  if (DEMO_MODE_FORCED) {
     // Simulate a short "thinking" delay so the demo feels like real AI.
     await new Promise((r) => setTimeout(r, 1200));
-    return demoAnalyze();
+    return { analysis: demoAnalyze(), mode: "demo" };
   }
-  return analyzeWithGemini(imageDataUrl);
+
+  try {
+    return await analyzeWithGemini(imageDataUrl);
+  } catch (err) {
+    // Graceful fallback: any Gemini failure (no key, rate limit, outage,
+    // timeout, bad response) degrades to demo instead of breaking the app.
+    // Never log the key or the image.
+    console.warn(
+      "[analyzeFood] Gemini failed, falling back to demo mode:",
+      err instanceof Error ? err.message : "unknown error"
+    );
+    return { analysis: demoAnalyze(), mode: "demo" };
+  }
 }
 
+/** True when real Gemini mode is active (key present + demo flag off). */
 export function isDemoMode(): boolean {
-  return DEMO_MODE;
+  return DEMO_MODE_FORCED || !process.env.GEMINI_API_KEY;
 }
