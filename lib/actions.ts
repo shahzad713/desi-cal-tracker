@@ -5,14 +5,24 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { z } from "zod";
+import { headers } from "next/headers";
 import { prisma } from "./db";
 import { requireUserId } from "./auth-actions";
-import { analyzeFoodImage, type FoodAnalysis } from "./analyzeFood";
+import { analyzeFoodImage, type FoodAnalysis, type AnalysisMode } from "./analyzeFood";
+import { checkRateLimit, clientIp } from "./rateLimit";
 
 export interface AnalyzeResult {
   analysis: FoodAnalysis;
   imagePath: string;
+  mode: AnalysisMode; // "gemini" when real AI answered, "demo" on fallback
 }
+
+// Scan budget: 20 scans/hour per user, 60/hour per IP. Keeps Gemini costs and
+// abuse under control. Buckets are in-memory (per-instance); Day 14 moves to
+// Redis/Upstash.
+const SCANS_PER_HOUR_PER_USER = 20;
+const SCANS_PER_HOUR_PER_IP = 60;
+const HOUR_MS = 60 * 60 * 1000;
 
 // --- Upload validation (security standard) ---
 // Allowlist: MIME type + magic bytes. The extension is DERIVED from the
@@ -55,7 +65,16 @@ function validateUpload(file: File, buffer: Buffer): string {
 /** Upload a photo, store it under public/uploads/, and run food analysis on it. */
 export async function analyzePhoto(formData: FormData): Promise<AnalyzeResult> {
   // Identity check first: no anonymous uploads, ever.
-  await requireUserId();
+  const userId = await requireUserId();
+
+  // SECURITY: rate-limit the AI scan path per user and per IP.
+  if (!checkRateLimit(`scan:${userId}`, SCANS_PER_HOUR_PER_USER, HOUR_MS)) {
+    throw new Error("Too many scans — please wait a bit and try again.");
+  }
+  const ip = clientIp(headers());
+  if (!checkRateLimit(`scan:ip:${ip}`, SCANS_PER_HOUR_PER_IP, HOUR_MS)) {
+    throw new Error("Too many scans — please wait a bit and try again.");
+  }
 
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) {
@@ -76,9 +95,9 @@ export async function analyzePhoto(formData: FormData): Promise<AnalyzeResult> {
 
   const mime = file.type;
   const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
-  const analysis = await analyzeFoodImage(dataUrl);
+  const { analysis, mode } = await analyzeFoodImage(dataUrl);
 
-  return { analysis, imagePath: `/uploads/${filename}` };
+  return { analysis, imagePath: `/uploads/${filename}`, mode };
 }
 
 const saveEntrySchema = z.object({
