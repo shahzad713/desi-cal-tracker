@@ -46,6 +46,12 @@ async function Nav() {
                 Dashboard
               </Link>
               <Link
+                href="/history"
+                className="rounded-full px-4 py-2 text-gray-700 hover:bg-orange-50"
+              >
+                History
+              </Link>
+              <Link
                 href="/profile"
                 title={session.user.email ?? "Profile"}
                 className="rounded-full bg-orange-100 px-4 py-2 text-orange-800 hover:bg-orange-200"
@@ -102,7 +108,7 @@ export default function RootLayout({
         <Nav />
         <main className="mx-auto max-w-3xl px-4 pb-16">{children}</main>
         <footer className="border-t border-orange-100 py-6 text-center text-xs text-gray-500">
-          Desi Cal AI — Day 2 build · secure sign-in live
+          Desi Cal AI — Day 4 build · full entry history
         </footer>
       </body>
     </html>
