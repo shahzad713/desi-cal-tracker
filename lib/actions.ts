@@ -124,20 +124,30 @@ export async function saveEntry(input: SaveEntryInput): Promise<void> {
   const parsed = saveEntrySchema.safeParse(input);
   if (!parsed.success) throw new Error("Invalid meal data.");
 
+  const base = {
+    baseCalories: Math.round(parsed.data.calories),
+    baseProtein: parsed.data.protein,
+    baseCarbs: parsed.data.carbs,
+    baseFat: parsed.data.fat,
+  };
+
   await prisma.foodEntry.create({
     data: {
       dishName: parsed.data.dishName,
       dishNameUrdu: parsed.data.dishNameUrdu,
-      calories: Math.round(parsed.data.calories),
-      protein: parsed.data.protein,
-      carbs: parsed.data.carbs,
-      fat: parsed.data.fat,
+      calories: base.baseCalories,
+      protein: base.baseProtein,
+      carbs: base.baseCarbs,
+      fat: base.baseFat,
       portion: parsed.data.portion,
       imagePath: parsed.data.imagePath,
       userId,
+      portionScale: 1,
+      ...base,
     },
   });
   revalidatePath("/dashboard");
+  revalidatePath("/history");
 }
 
 /**
@@ -149,6 +159,151 @@ export async function deleteEntry(id: string): Promise<void> {
   if (!z.string().cuid().safeParse(id).success) throw new Error("Invalid entry.");
 
   await prisma.foodEntry.deleteMany({ where: { id, userId } });
+  revalidatePath("/dashboard");
+  revalidatePath("/history");
+}
+
+// --- Day 4: history, edit, portion adjust ---
+
+/** Strict YYYY-MM-DD validation: real calendar date, not in the future. */
+const dateParamSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((s) => {
+    const [y, m, d] = s.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    return (
+      dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
+    );
+  }, "Not a real date")
+  .refine((s) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d).getTime() <= new Date().setHours(0, 0, 0, 0);
+  }, "Future dates are not allowed");
+
+function dayBounds(dateStr: string): { start: Date; end: Date } {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const start = new Date(y, m - 1, d);
+  const end = new Date(y, m - 1, d + 1);
+  return { start, end };
+}
+
+/**
+ * All entries for one calendar day (local time), signed-in user only.
+ * Invalid or future dates throw — the history page falls back to today.
+ */
+export async function getEntriesForDate(dateStr: string) {
+  const userId = await requireUserId();
+  const parsed = dateParamSchema.safeParse(dateStr);
+  if (!parsed.success) throw new Error("Invalid date.");
+  const { start, end } = dayBounds(parsed.data);
+  return prisma.foodEntry.findMany({
+    where: { userId, createdAt: { gte: start, lt: end } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+const editEntrySchema = z.object({
+  dishName: z.string().trim().min(1).max(200),
+  dishNameUrdu: z.string().trim().max(200).optional(),
+  calories: z.number().finite().min(0).max(20000),
+  protein: z.number().finite().min(0).max(2000),
+  carbs: z.number().finite().min(0).max(2000),
+  fat: z.number().finite().min(0).max(2000),
+  portion: z.string().trim().min(1).max(200),
+});
+
+export type EditEntryInput = z.infer<typeof editEntrySchema>;
+
+/**
+ * Edit one entry — ONLY if it belongs to the signed-in user.
+ * Ownership is enforced in the WHERE clause; a forged id updates nothing.
+ * The edited values become the new portion base (scale resets to 1×).
+ */
+export async function updateEntry(id: string, input: EditEntryInput): Promise<void> {
+  const userId = await requireUserId();
+  if (!z.string().cuid().safeParse(id).success) throw new Error("Invalid entry.");
+  const parsed = editEntrySchema.safeParse(input);
+  if (!parsed.success) throw new Error("Invalid meal data.");
+
+  const base = {
+    baseCalories: Math.round(parsed.data.calories),
+    baseProtein: Math.round(parsed.data.protein * 10) / 10,
+    baseCarbs: Math.round(parsed.data.carbs * 10) / 10,
+    baseFat: Math.round(parsed.data.fat * 10) / 10,
+  };
+
+  await prisma.foodEntry.updateMany({
+    where: { id, userId },
+    data: {
+      dishName: parsed.data.dishName,
+      dishNameUrdu: parsed.data.dishNameUrdu,
+      calories: base.baseCalories,
+      protein: base.baseProtein,
+      carbs: base.baseCarbs,
+      fat: base.baseFat,
+      portion: parsed.data.portion,
+      portionScale: 1,
+      ...base,
+    },
+  });
+  revalidatePath("/history");
+  revalidatePath("/dashboard");
+}
+
+// Fixed scale steps — nutrition is ALWAYS computed as round(base * scale),
+// so adjusting portions back and forth never drifts.
+const PORTION_SCALES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const portionScaleSchema = z
+  .number()
+  .refine((v): v is (typeof PORTION_SCALES)[number] =>
+    (PORTION_SCALES as readonly number[]).includes(v)
+  );
+
+/**
+ * Set an entry's portion scale — ONLY if it belongs to the signed-in user.
+ * Values are recomputed from the base (drift-free); the base columns are
+ * included in the WHERE clause as an optimistic lock so a concurrent edit
+ * can't silently mix stale bases with new values.
+ */
+export async function setPortionScale(id: string, scale: number): Promise<void> {
+  const userId = await requireUserId();
+  if (!z.string().cuid().safeParse(id).success) throw new Error("Invalid entry.");
+  if (!portionScaleSchema.safeParse(scale).success) {
+    throw new Error("Invalid portion size.");
+  }
+
+  const entry = await prisma.foodEntry.findFirst({
+    where: { id, userId },
+    select: {
+      baseCalories: true,
+      baseProtein: true,
+      baseCarbs: true,
+      baseFat: true,
+    },
+  });
+  if (!entry) throw new Error("Entry not found.");
+
+  const { count } = await prisma.foodEntry.updateMany({
+    where: {
+      id,
+      userId,
+      baseCalories: entry.baseCalories,
+      baseProtein: entry.baseProtein,
+      baseCarbs: entry.baseCarbs,
+      baseFat: entry.baseFat,
+    },
+    data: {
+      portionScale: scale,
+      calories: Math.round(entry.baseCalories * scale),
+      protein: Math.round(entry.baseProtein * scale * 10) / 10,
+      carbs: Math.round(entry.baseCarbs * scale * 10) / 10,
+      fat: Math.round(entry.baseFat * scale * 10) / 10,
+    },
+  });
+  if (count === 0) throw new Error("Entry changed while saving — please try again.");
+
+  revalidatePath("/history");
   revalidatePath("/dashboard");
 }
 

@@ -44,7 +44,15 @@
 - [x] Smoke-tested: forced demo → demo samples; real path without key → warning + graceful demo fallback
 - [x] `npm run build` green
 
-## ⏳ Day 4 — Entry history + edit + portion adjust
+## ✅ Day 4 — Entry history + edit + portion adjust (2026-09-26)
+
+- [x] New protected `/history` page with date navigation: prev/next/today buttons, jump-to-date picker, `?date=YYYY-MM-DD` URL state; invalid or future dates fall back to today
+- [x] `getEntriesForDate(dateStr)` — strict zod date validation (real calendar date, no future), entries scoped by session userId, day totals card
+- [x] `updateEntry(id, input)` — full edit dialog (dish name, Urdu name, portion, calories + macros); ownership enforced via `updateMany({id, userId})`; edited values become the new portion base
+- [x] `setPortionScale(id, scale)` — portion adjust (¼ / ½ / ¾ / 1 / 1¼ / 1½ / 2×) with drift-free math: values always `round(base * scale)`; base columns locked in the WHERE clause (optimistic lock); new schema fields `portionScale`, `baseCalories/Protein/Carbs/Fat` + migration with backfill
+- [x] Shared `EntryCard` component: thumbnail, ×N scale badge, portion select, edit dialog, delete with confirm; `saveEntry`/`deleteEntry` now revalidate both `/dashboard` and `/history`
+- [x] SECURITY: middleware matcher extended to `/history/:path*`; edit/scale/delete verify ownership server-side (forged ids touch nothing); all inputs zod-validated; portion scale restricted to a fixed allowlist (no arbitrary multipliers)
+- [x] Smoke-tested: scale math verified drift-free across repeated adjustments (650 → 2×/0.5×/1.5×/… → exactly 650); `npm run build` green
 
 ## ⏳ Day 5 — Weekly charts (recharts)
 

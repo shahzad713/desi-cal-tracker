@@ -1,4 +1,4 @@
-// Desi Cal AI — Prisma schema (Day 1)
+// Desi Cal AI — Prisma schema (Day 4)
 // Dev database: SQLite (DATABASE_URL="file:./dev.db").
 // DAY 14: switch `provider` to "postgresql" and point DATABASE_URL at Neon.
 // The schema deliberately uses only cross-compatible features (cuid(), Float,
@@ -77,6 +77,14 @@ model FoodEntry {
   portion      String
   imagePath    String? // e.g. /uploads/<uuid>.jpg (public/uploads is gitignored)
   createdAt    DateTime @default(now())
+  // Day 4: portion tracking. The current values are always
+  // round(baseX * portionScale) — scaling from the base never drifts,
+  // no matter how many times the portion is adjusted.
+  portionScale Float @default(1)
+  baseCalories Int   @default(0)
+  baseProtein  Float @default(0)
+  baseCarbs    Float @default(0)
+  baseFat      Float @default(0)
 
   @@index([userId])
   @@index([createdAt])
