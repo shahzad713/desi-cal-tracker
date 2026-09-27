@@ -1,7 +1,13 @@
-// Edge gate: /track, /dashboard, /profile and /history require a signed-in user.
+// Edge gate: /track, /dashboard, /charts, /profile and /history require a signed-in user.
 // Everyone else is bounced to /login (Auth.js `pages.signIn`).
 export { auth as middleware } from "@/auth";
 
 export const config = {
-  matcher: ["/track/:path*", "/dashboard/:path*", "/profile/:path*", "/history/:path*"],
+  matcher: [
+    "/track/:path*",
+    "/dashboard/:path*",
+    "/charts/:path*",
+    "/profile/:path*",
+    "/history/:path*",
+  ],
 };

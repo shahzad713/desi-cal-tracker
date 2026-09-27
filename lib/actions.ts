@@ -317,3 +317,76 @@ export async function getTodayEntries() {
     orderBy: { createdAt: "desc" },
   });
 }
+
+// --- Day 5: charts / weekly stats ---
+
+import { CHART_RANGES, type DayStats } from "./nutrition";
+
+const dayKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/**
+ * Per-day totals for the last N days (N = 7, 14 or 30), signed-in user only.
+ * Returns a full series — days with no entries are zeros — so charts always render.
+ * All input is a fixed allowlist; all queries are scoped by userId.
+ */
+export async function getNutritionSeries(days: number): Promise<DayStats[]> {
+  const userId = await requireUserId();
+  if (!(CHART_RANGES as readonly number[]).includes(days)) {
+    throw new Error("Invalid range.");
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - (days - 1));
+
+  const entries = await prisma.foodEntry.findMany({
+    where: { userId, createdAt: { gte: start } },
+    select: {
+      createdAt: true,
+      calories: true,
+      protein: true,
+      carbs: true,
+      fat: true,
+    },
+  });
+
+  // Seed every day in the window, then accumulate.
+  const series = new Map<string, DayStats>();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = dayKey(d);
+    series.set(key, {
+      date: key,
+      label: days > 14 ? String(d.getDate()) : WEEKDAYS[d.getDay()],
+      entries: 0,
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+    });
+  }
+  for (const e of entries) {
+    const key = dayKey(new Date(e.createdAt));
+    const day = series.get(key);
+    if (!day) continue; // outside window (shouldn't happen)
+    day.entries += 1;
+    day.calories += e.calories;
+    day.protein += e.protein;
+    day.carbs += e.carbs;
+    day.fat += e.fat;
+  }
+  return Array.from(series.values()).map((d) => ({
+    ...d,
+    calories: Math.round(d.calories),
+    protein: Math.round(d.protein * 10) / 10,
+    carbs: Math.round(d.carbs * 10) / 10,
+    fat: Math.round(d.fat * 10) / 10,
+  }));
+}

@@ -54,7 +54,16 @@
 - [x] SECURITY: middleware matcher extended to `/history/:path*`; edit/scale/delete verify ownership server-side (forged ids touch nothing); all inputs zod-validated; portion scale restricted to a fixed allowlist (no arbitrary multipliers)
 - [x] Smoke-tested: scale math verified drift-free across repeated adjustments (650 → 2×/0.5×/1.5×/… → exactly 650); `npm run build` green
 
-## ⏳ Day 5 — Weekly charts (recharts)
+## ✅ Day 5 — Weekly charts + macro breakdown (2026-09-27)
+
+- [x] New protected `/charts` page (middleware matcher extended) with 7/14/30-day range selector (`?range=`, invalid values fall back to 7)
+- [x] `getNutritionSeries(days)` server action — per-day calories + macro totals, full seeded series (zero-filled days, charts always render)
+- [x] `lib/nutrition.ts` — `CHART_RANGES` allowlist + `DayStats` type in a plain module ("use server" files can't export non-functions)
+- [x] Charts (`app/charts/Charts.tsx`, recharts client components): daily calorie bar chart w/ 2,000 kcal target reference line; macro donut (calorie-equivalent protein/carbs/fat split, 4-4-9); stacked macro-grams bars per day
+- [x] Summary cards: total kcal, avg/day, avg protein, busiest day; friendly empty state when nothing logged
+- [x] Nav "Charts" link; footer updated
+- [x] SECURITY: range restricted to a fixed [7,14,30] allowlist (action throws otherwise); every aggregation scoped by session `userId`; middleware auth on `/charts`
+- [x] Smoke-tested: anon `/charts` (and `?range=999`) → 307 to /login; `npm run build` green
 
 ## ⏳ Day 6 — Daily targets + streaks
 
