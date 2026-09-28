@@ -322,6 +322,130 @@ export async function getTodayEntries() {
 
 import { CHART_RANGES, type DayStats } from "./nutrition";
 
+// --- Day 6: goals — daily target, weight goal, streaks ---
+
+import {
+  CALORIE_TARGET_MIN,
+  CALORIE_TARGET_MAX,
+  WEIGHT_MIN_KG,
+  WEIGHT_MAX_KG,
+  computeStreaks,
+  type Streaks,
+} from "./goals";
+import { todayParam } from "./date";
+
+const weightSchema = z
+  .number()
+  .finite()
+  .min(WEIGHT_MIN_KG)
+  .max(WEIGHT_MAX_KG)
+  .nullable()
+  .optional();
+
+const updateGoalsSchema = z.object({
+  dailyCalorieTarget: z
+    .number()
+    .int()
+    .min(CALORIE_TARGET_MIN)
+    .max(CALORIE_TARGET_MAX),
+  currentWeight: weightSchema,
+  targetWeight: weightSchema,
+});
+
+export type UpdateGoalsInput = z.infer<typeof updateGoalsSchema>;
+
+export interface GoalStats {
+  dailyCalorieTarget: number;
+  currentWeight: number | null;
+  targetWeight: number | null;
+  todayCalories: number;
+  streaks: Streaks;
+}
+
+// Settings updates are cheap but personal — a small per-user rate limit stops
+// automated hammering of the row.
+const GOALS_UPDATES_PER_10MIN = 10;
+
+/**
+ * Update the signed-in user's goals (daily calorie target + weight goal).
+ * All values are zod-bounded server-side; the update touches ONLY the
+ * caller's own User row (updateMany would be wrong here — we assert the id).
+ */
+export async function updateGoals(input: UpdateGoalsInput): Promise<void> {
+  const userId = await requireUserId();
+  if (
+    !checkRateLimit(
+      `goals:${userId}`,
+      GOALS_UPDATES_PER_10MIN,
+      10 * 60 * 1000
+    )
+  ) {
+    throw new Error("Too many updates — please wait a bit and try again.");
+  }
+  const parsed = updateGoalsSchema.safeParse(input);
+  if (!parsed.success) throw new Error("Invalid goal values.");
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      dailyCalorieTarget: parsed.data.dailyCalorieTarget,
+      currentWeight: parsed.data.currentWeight ?? null,
+      targetWeight: parsed.data.targetWeight ?? null,
+    },
+  });
+  revalidatePath("/goals");
+  revalidatePath("/dashboard");
+  revalidatePath("/profile");
+}
+
+const streakDayKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+
+/**
+ * Goal stats for the signed-in user only: targets, today's logged calories,
+ * and streaks derived from their own entry history.
+ */
+export async function getGoalStats(): Promise<GoalStats> {
+  const userId = await requireUserId();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [user, todayTotals, entryDays] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        dailyCalorieTarget: true,
+        currentWeight: true,
+        targetWeight: true,
+      },
+    }),
+    prisma.foodEntry.aggregate({
+      where: { userId, createdAt: { gte: today } },
+      _sum: { calories: true },
+    }),
+    // All logged days ever, oldest-first — entry counts are small, so a full
+    // user-scoped scan is fine. (Day 14+: keyset/paginate if needed.)
+    prisma.foodEntry.findMany({
+      where: { userId },
+      select: { createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+  if (!user) throw new Error("Account not found.");
+
+  const dayKeys = entryDays.map((e) => streakDayKey(new Date(e.createdAt)));
+  return {
+    dailyCalorieTarget: user.dailyCalorieTarget,
+    currentWeight: user.currentWeight,
+    targetWeight: user.targetWeight,
+    todayCalories: todayTotals._sum.calories ?? 0,
+    streaks: computeStreaks(dayKeys, todayParam()),
+  };
+}
+
 const dayKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate()

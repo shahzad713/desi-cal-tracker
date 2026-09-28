@@ -58,6 +58,12 @@ async function Nav() {
                 Charts
               </Link>
               <Link
+                href="/goals"
+                className="rounded-full px-4 py-2 text-gray-700 hover:bg-orange-50"
+              >
+                Goals
+              </Link>
+              <Link
                 href="/profile"
                 title={session.user.email ?? "Profile"}
                 className="rounded-full bg-orange-100 px-4 py-2 text-orange-800 hover:bg-orange-200"
@@ -114,7 +120,7 @@ export default function RootLayout({
         <Nav />
         <main className="mx-auto max-w-3xl px-4 pb-16">{children}</main>
         <footer className="border-t border-orange-100 py-6 text-center text-xs text-gray-500">
-          Desi Cal AI — Day 5 build · weekly charts
+          Desi Cal AI — Day 6 build · daily goals & streaks
         </footer>
       </body>
     </html>

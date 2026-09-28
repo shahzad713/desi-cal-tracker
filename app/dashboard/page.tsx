@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getTodayEntries } from "@/lib/actions";
+import { getTodayEntries, getGoalStats } from "@/lib/actions";
 import DeleteButton from "./DeleteButton";
 
 // Always render fresh — entries are added throughout the day.
@@ -10,8 +10,9 @@ export const metadata = {
   title: "Today's log — Desi Cal AI",
 };
 
-// Soft daily targets used to scale the bars (personalised targets land Day 6).
-const TARGETS = { calories: 2000, protein: 120, carbs: 250, fat: 65 };
+// Soft macro targets used to scale the bars (Day 6: calorie target is
+// personal; macro targets personalise later).
+const TARGETS = { protein: 120, carbs: 250, fat: 65 };
 
 function Bar({
   label,
@@ -47,7 +48,10 @@ function Bar({
 }
 
 export default async function DashboardPage() {
-  const entries = await getTodayEntries();
+  const [entries, stats] = await Promise.all([
+    getTodayEntries(),
+    getGoalStats(),
+  ]);
   const totals = entries.reduce(
     (t, e) => ({
       calories: t.calories + e.calories,
@@ -68,6 +72,13 @@ export default async function DashboardPage() {
           month: "long",
         })}
       </p>
+      <Link
+        href="/goals"
+        className="mt-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-1.5 text-sm font-semibold text-orange-800 shadow-sm hover:bg-orange-50"
+      >
+        🔥 {stats.streaks.current}-day streak · 🎯{" "}
+        {stats.dailyCalorieTarget.toLocaleString()} kcal target
+      </Link>
 
       {/* Totals card */}
       <div className="mt-6 rounded-2xl border border-orange-100 bg-white p-6 shadow-sm">
@@ -79,12 +90,17 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="mt-4 space-y-3">
+          <Bar label="Calories" value={totals.calories} target={stats.dailyCalorieTarget} unit="kcal" color="bg-orange-500" />
           <Bar label="Protein" value={totals.protein} target={TARGETS.protein} unit="g" color="bg-emerald-500" />
           <Bar label="Carbs" value={totals.carbs} target={TARGETS.carbs} unit="g" color="bg-amber-500" />
           <Bar label="Fat" value={totals.fat} target={TARGETS.fat} unit="g" color="bg-rose-500" />
         </div>
         <p className="mt-3 text-xs text-gray-400">
-          Bars scaled to default targets (2,000 kcal) — personal targets arrive Day 6.
+          Calorie bar uses your personal target —{" "}
+          <Link href="/goals" className="font-semibold text-orange-600 hover:underline">
+            set it on the Goals page
+          </Link>
+          . Macro targets stay at sensible defaults for now.
         </p>
       </div>
 

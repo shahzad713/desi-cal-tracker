@@ -65,7 +65,18 @@
 - [x] SECURITY: range restricted to a fixed [7,14,30] allowlist (action throws otherwise); every aggregation scoped by session `userId`; middleware auth on `/charts`
 - [x] Smoke-tested: anon `/charts` (and `?range=999`) → 307 to /login; `npm run build` green
 
-## ⏳ Day 6 — Daily targets + streaks
+## ✅ Day 6 — Goals: daily target, weight goal, streaks (2026-09-28)
+
+- [x] Prisma: `User.dailyCalorieTarget` (default 2000), `currentWeight`, `targetWeight` (kg, nullable) + migration `goals`
+- [x] `lib/goals.ts` — pure module: calorie/weight bounds, `computeStreaks(dayKeys, todayKey)` (current = run ending today or yesterday; best = longest run), `remainingCalories()`
+- [x] New protected `/goals` page (middleware matcher extended): today-vs-target card with progress bar (over-budget warning), 🔥 current streak / 🏆 best streak / ⚖️ weight-goal cards, edit form (GoalsForm client component)
+- [x] `updateGoals` action — zod-bounded (800–10,000 kcal; 20–600 kg), rate-limited 10/10min per user, updates ONLY the caller's own User row
+- [x] `getGoalStats` action — user-scoped; streaks derived from the user's own entry history (zero entries → 0/0, charts-friendly)
+- [x] Dashboard: streak + personal-target chip linking to /goals; calorie bar now uses the user's personal target (default 2,000); "set on Goals page" note
+- [x] Nav "Goals" link; footer updated
+- [x] SECURITY: `/goals` behind edge middleware auth; all stats/updates scoped by session userId; zod validation on every input; settings rate-limited
+- [x] Smoke-tested: anon `/goals` → 307 to /login; signed-in `/goals` → 200 renders all cards; streak math unit-checked (alive-via-yesterday, gap-breaks, best-run)
+- [x] `npm run build` green
 
 ## ⏳ Day 7 — Desi food database (200+ dishes, search, Urdu names)
 

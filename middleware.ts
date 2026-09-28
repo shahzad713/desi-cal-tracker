@@ -1,5 +1,6 @@
-// Edge gate: /track, /dashboard, /charts, /profile and /history require a signed-in user.
-// Everyone else is bounced to /login (Auth.js `pages.signIn`).
+// Edge gate: /track, /dashboard, /charts, /profile, /history and /goals
+// require a signed-in user. Everyone else is bounced to /login (Auth.js
+// `pages.signIn`).
 export { auth as middleware } from "@/auth";
 
 export const config = {
@@ -9,5 +10,6 @@ export const config = {
     "/charts/:path*",
     "/profile/:path*",
     "/history/:path*",
+    "/goals/:path*",
   ],
 };
