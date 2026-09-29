@@ -78,7 +78,18 @@
 - [x] Smoke-tested: anon `/goals` → 307 to /login; signed-in `/goals` → 200 renders all cards; streak math unit-checked (alive-via-yesterday, gap-breaks, best-run)
 - [x] `npm run build` green
 
-## ⏳ Day 7 — Desi food database (200+ dishes, search, Urdu names)
+## ✅ Day 7 — Desi food database: 209 dishes, search, one-tap logging (2026-09-29)
+
+- [x] `prisma/dishes-data.ts` — 209 desi dishes across 12 categories (Breads 19, Rice & Biryani 19, Dals & Legumes 15, Chicken Curries 14, Meat Curries 21, Vegetables & Paneer 17, Kebabs & Grills 19, Breakfast 14, Snacks & Street Food 24, Desserts & Sweets 22, Drinks & Beverages 13, Dahi/Raita/Sides 12); every dish has an Urdu name, per-serving calories + macros, serving size. Data validated: no dupes, all categories in allowlist, no missing Urdu names
+- [x] Prisma: `Dish.category` (String, indexed) + migration `dish_category`; seed upserts all 209 (idempotent)
+- [x] `lib/dishes.ts` — `DISH_CATEGORIES` allowlist + `MAX_DISH_RESULTS` (60) in a plain module
+- [x] New protected `/dishes` page (middleware matcher extended): server-rendered search (GET form, English + Urdu `?q=`), category filter (`?category=`), results grid; invalid input falls back to browse-all — never a broken page
+- [x] `DishCard` client component: kcal, macro split, serving size, Urdu name, category badge, **+ Log** button → `logDish` server action (one-tap manual add, no photo needed)
+- [x] `searchDishes` / `logDish` actions — zod-validated (q ≤100 chars, category must be in allowlist, dishId cuid); rate-limited (60 searches/min, 120 logs/hr per user); `logDish` looks the dish up server-side so nutrition values can't be tampered with; entries always written to the caller's own userId
+- [x] Track page links to the database ("No photo? Pick from the 209-dish database →"); nav "Dishes" link; footer updated
+- [x] SECURITY: `/dishes` behind edge middleware auth (anon → 307 to /login); Dish table is shared reference data (no userId scoping needed); all inputs zod-validated; per-user rate limits; no client-supplied nutrition values
+- [x] Smoke-tested: anon `/dishes` (+ `?q=`) → 307; signed-in renders 200 with 60 cards; `?q=biryani` → 7 hits; Urdu `?q=کڑاہی` → 4 karahi hits; category filter → 22 desserts; invalid category → graceful browse-all fallback
+- [x] `npm run build` green
 
 ## ⏳ Day 8 — PWA + mobile camera capture
 

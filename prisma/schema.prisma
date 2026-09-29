@@ -1,4 +1,4 @@
-// Desi Cal AI — Prisma schema (Day 6)
+// Desi Cal AI — Prisma schema (Day 7)
 // Dev database: SQLite (DATABASE_URL="file:./dev.db").
 // DAY 14: switch `provider` to "postgresql" and point DATABASE_URL at Neon.
 // The schema deliberately uses only cross-compatible features (cuid(), Float,
@@ -97,7 +97,9 @@ model FoodEntry {
 }
 
 // Reference nutrition data for common desi dishes.
-// Day 1: seeded with 10 dishes. Day 7: expanded to 200+ with search + Urdu names.
+// Day 1: seeded with 10 dishes. Day 7: expanded to 200+ with search + Urdu
+// names + categories; the /dishes page lets users browse, search and one-tap
+// log any dish (manual add without a photo).
 model Dish {
   id          String  @id @default(cuid())
   name        String  @unique
@@ -107,4 +109,7 @@ model Dish {
   carbs       Float // grams per serving
   fat         Float // grams per serving
   servingSize String
+  category    String  @default("Other") // one of DISH_CATEGORIES (lib/dishes.ts)
+
+  @@index([category])
 }

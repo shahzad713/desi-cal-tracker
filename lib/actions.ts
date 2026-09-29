@@ -318,6 +318,127 @@ export async function getTodayEntries() {
   });
 }
 
+// --- Day 7: desi dish database — search + one-tap manual logging ---
+
+import { DISH_CATEGORIES, MAX_DISH_RESULTS } from "./dishes";
+
+const dishSearchSchema = z.object({
+  q: z.string().trim().max(100).optional().default(""),
+  category: z.string().trim().max(60).optional(),
+});
+
+export interface DishResult {
+  id: string;
+  name: string;
+  nameUrdu: string | null;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  servingSize: string;
+  category: string;
+}
+
+// Search is cheap, but still bounded per user so the DB can't be hammered.
+const DISH_SEARCHES_PER_MINUTE = 60;
+
+/**
+ * Search the shared 200+ dish reference database by name (English or Urdu)
+ * and/or category. The Dish table is reference data — it belongs to nobody,
+ * so no userId scoping is needed here; only signed-in users can search.
+ */
+export async function searchDishes(input?: {
+  q?: string;
+  category?: string;
+}): Promise<DishResult[]> {
+  const userId = await requireUserId();
+  if (
+    !checkRateLimit(`dishes:${userId}`, DISH_SEARCHES_PER_MINUTE, 60 * 1000)
+  ) {
+    throw new Error("Too many searches — slow down a little.");
+  }
+  const parsed = dishSearchSchema.safeParse(input ?? {});
+  if (!parsed.success) throw new Error("Invalid search.");
+
+  const q = parsed.data.q;
+  const category = parsed.data.category || undefined;
+  if (category && !(DISH_CATEGORIES as readonly string[]).includes(category)) {
+    throw new Error("Invalid category.");
+  }
+
+  return prisma.dish.findMany({
+    where: {
+      ...(category ? { category } : {}),
+      ...(q
+        ? {
+            OR: [
+              { name: { contains: q } },
+              { nameUrdu: { contains: q } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: { name: "asc" },
+    take: MAX_DISH_RESULTS,
+    select: {
+      id: true,
+      name: true,
+      nameUrdu: true,
+      calories: true,
+      protein: true,
+      carbs: true,
+      fat: true,
+      servingSize: true,
+      category: true,
+    },
+  });
+}
+
+// Manual logging is cheap, but still bounded per user.
+const DISH_LOGS_PER_HOUR = 120;
+
+/**
+ * One-tap manual add: log a dish from the reference database straight into
+ * the signed-in user's food log — no photo needed. The dish id is validated
+ * (cuid) and looked up server-side; the client never supplies nutrition
+ * values, so they can't be tampered with. The entry always lands on the
+ * caller's own userId.
+ */
+export async function logDish(dishId: string): Promise<void> {
+  const userId = await requireUserId();
+  if (
+    !checkRateLimit(`logdish:${userId}`, DISH_LOGS_PER_HOUR, 60 * 60 * 1000)
+  ) {
+    throw new Error("Too many logs — please wait a bit and try again.");
+  }
+  if (!z.string().cuid().safeParse(dishId).success) {
+    throw new Error("Invalid dish.");
+  }
+
+  const dish = await prisma.dish.findUnique({ where: { id: dishId } });
+  if (!dish) throw new Error("Dish not found.");
+
+  await prisma.foodEntry.create({
+    data: {
+      dishName: dish.name,
+      dishNameUrdu: dish.nameUrdu,
+      calories: dish.calories,
+      protein: dish.protein,
+      carbs: dish.carbs,
+      fat: dish.fat,
+      portion: dish.servingSize,
+      userId,
+      portionScale: 1,
+      baseCalories: dish.calories,
+      baseProtein: dish.protein,
+      baseCarbs: dish.carbs,
+      baseFat: dish.fat,
+    },
+  });
+  revalidatePath("/dashboard");
+  revalidatePath("/history");
+}
+
 // --- Day 5: charts / weekly stats ---
 
 import { CHART_RANGES, type DayStats } from "./nutrition";
