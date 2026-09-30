@@ -91,7 +91,17 @@
 - [x] Smoke-tested: anon `/dishes` (+ `?q=`) → 307; signed-in renders 200 with 60 cards; `?q=biryani` → 7 hits; Urdu `?q=کڑاہی` → 4 karahi hits; category filter → 22 desserts; invalid category → graceful browse-all fallback
 - [x] `npm run build` green
 
-## ⏳ Day 8 — PWA + mobile camera capture
+## ✅ Day 8 — PWA: installable + mobile camera capture (2026-09-30)
+
+- [x] `public/manifest.json` — full installable manifest (standalone display, orange theme color, `/dashboard` start_url, 192/512 + maskable icons, health/food categories)
+- [x] `public/icons/` — hand-built PWA icons (icon-192/512, maskable-512, apple-touch-icon-180) via `scripts/make-icons.py` (PIL)
+- [x] `public/sw.js` — hand-rolled service worker: cache-first for hashed static assets; network-first for navigations with 5s timeout + offline fallback; **never** caches POSTs (server actions/logins) or cross-origin — no user data served stale or leakable
+- [x] `/offline` page (public, precached by SW) with friendly retry UI
+- [x] `app/pwa-boot.tsx` — registers SW in production only (dev stays uncached), captures `beforeinstallprompt` → dismissible "Install Desi Cal AI" banner
+- [x] Layout: `manifest` link, `themeColor` + `viewportFit=cover` viewport, apple-touch icon; mobile bottom tab bar (Today / Track / Dishes / Charts / Goals) with safe-area padding; top nav text links hidden on mobile to reduce crowding
+- [x] Track page: **"Take a photo"** button with `capture="environment"` opens the rear camera directly on mobile; separate **"Gallery"** button for the file picker; bigger touch targets, `active:scale` feedback
+- [x] SECURITY: offline page + manifest + SW assets all public and user-agnostic (nothing user-scoped in cache); auth-gated routes still 307 to /login; no secrets in client bundle; SW scope `self.location.origin` only
+- [x] Smoke-tested: `/manifest.json` 200 JSON, `/sw.js` 200 JS, `/offline` 200 (no auth bounce), `/track` still 307 for anon; `npm run build` green
 
 ## ⏳ Day 9 — Marketing landing v2 + waitlist
 
