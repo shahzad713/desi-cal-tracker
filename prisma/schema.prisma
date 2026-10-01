@@ -96,6 +96,19 @@ model FoodEntry {
   @@index([createdAt])
 }
 
+// Day 9: marketing waitlist — launch updates + early Pro access.
+// Public endpoint by design; abuse is handled with validation + rate limits
+// in the server action (lib/waitlist.ts), not with auth.
+model WaitlistSignup {
+  id        String   @id @default(cuid())
+  email     String   @unique // lowercased + trimmed at write time
+  name      String? // optional first name, plain text ≤ 60 chars
+  source    String? // where they signed up, e.g. "landing-v2"
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // Reference nutrition data for common desi dishes.
 // Day 1: seeded with 10 dishes. Day 7: expanded to 200+ with search + Urdu
 // names + categories; the /dishes page lets users browse, search and one-tap

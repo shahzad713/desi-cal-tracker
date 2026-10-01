@@ -1,4 +1,48 @@
 import Link from "next/link";
+import WaitlistForm from "./waitlist-form";
+import ProductTour from "./product-tour";
+
+// Day 9 — marketing landing v2: product tour, feature grid, FAQ, launch waitlist.
+
+const STATS = [
+  { value: "209", label: "desi dishes in the database" },
+  { value: "4", label: "macros tracked per meal: kcal, protein, carbs, fat" },
+  { value: "15s", label: "from photo to nutrition estimate" },
+  { value: "100%", label: "your meals stay private to your account" },
+];
+
+const FEATURES = [
+  {
+    icon: "🤖",
+    title: "AI photo analysis",
+    text: "Gemini vision reads your plate — dish name, portion, calories, protein, carbs, fat. Built for desi food, not salads.",
+  },
+  {
+    icon: "📚",
+    title: "209-dish desi database",
+    text: "Biryani to nihari to jalebi — searchable in English and اردو, with per-serving nutrition for every dish.",
+  },
+  {
+    icon: "📈",
+    title: "Charts that motivate",
+    text: "Weekly calorie bars, macro donut, per-day breakdowns. See patterns, not just numbers.",
+  },
+  {
+    icon: "🔥",
+    title: "Goals & streaks",
+    text: "Set your daily calorie target and weight goal. Keep the streak alive — one logged day at a time.",
+  },
+  {
+    icon: "📱",
+    title: "Installs like an app",
+    text: "PWA with offline support and one-tap rear-camera capture. Add it to your home screen, no app store needed.",
+  },
+  {
+    icon: "🔒",
+    title: "Private by design",
+    text: "Your meals are yours alone — every entry is scoped to your account, uploads are validated, and nothing leaks.",
+  },
+];
 
 const STEPS = [
   {
@@ -18,45 +62,118 @@ const STEPS = [
   },
 ];
 
+const FAQS = [
+  {
+    q: "How accurate are the calorie estimates?",
+    a: "They're smart estimates, not lab measurements — AI reads the dish and portion from your photo, backed by our 209-dish nutrition database. Great for daily tracking and trends; not medical advice. If you have a health condition, check with a professional.",
+  },
+  {
+    q: "Which cuisines does it understand?",
+    a: "Pakistani and Indian food first — biryani, nihari, haleem, karahi, daal, kebabs, mithai and 200+ more. The database grows every week.",
+  },
+  {
+    q: "Is it free?",
+    a: "Yes — the beta is completely free while we build toward launch. Join the waitlist below for launch updates and early access to Desi Cal Pro (unlimited AI scans).",
+  },
+  {
+    q: "Is my food data private?",
+    a: "Completely. Every entry is tied to your account and only you can see it. We never sell data, and uploads are validated and stored securely.",
+  },
+];
+
 export default function Home() {
   return (
-    <div className="pt-10">
+    <div>
       {/* Hero */}
-      <section className="text-center">
-        <div className="text-6xl">🍛</div>
-        <h1 className="mt-4 text-4xl font-extrabold tracking-tight sm:text-5xl">
-          Know your <span className="text-orange-600">desi food</span>,
+      <section className="pt-12 text-center sm:pt-16">
+        <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-4 py-1.5 text-sm font-semibold text-orange-700">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
+          </span>
+          Free during beta · Built in public
+        </div>
+        <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-6xl">
+          Your <span className="text-orange-600">desi food</span>,
           <br />
-          one photo at a time
+          decoded by AI 🍛
         </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-gray-600">
+        <p className="mx-auto mt-5 max-w-xl text-lg text-gray-600">
           Generic calorie apps don&apos;t understand biryani, nihari or
           haleem. Desi Cal AI does — snap your plate and get instant
           calorie &amp; macro estimates for Pakistani &amp; Indian dishes.
         </p>
-        <div className="mt-8 flex justify-center gap-3">
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
-            href="/track"
-            className="rounded-full bg-orange-600 px-8 py-3 text-lg font-semibold text-white shadow-lg shadow-orange-200 hover:bg-orange-700"
+            href="/signup"
+            className="w-full rounded-full bg-orange-600 px-8 py-3.5 text-lg font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-700 sm:w-auto"
           >
-            Start tracking →
+            Start tracking free →
           </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-full border border-orange-200 bg-white px-8 py-3 text-lg font-semibold text-orange-700 hover:bg-orange-50"
+          <a
+            href="#tour"
+            className="w-full rounded-full border border-orange-200 bg-white px-8 py-3.5 text-lg font-semibold text-orange-700 transition hover:bg-orange-50 sm:w-auto"
           >
-            Dashboard
-          </Link>
+            See it in action
+          </a>
         </div>
         <p className="mt-4 text-xs text-gray-400">
-          Free during beta · Your meals stay private to your account
+          No credit card · Your meals stay private to your account
         </p>
+
+        {/* Stats */}
+        <dl className="mx-auto mt-12 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
+          {STATS.map((s) => (
+            <div
+              key={s.label}
+              className="rounded-2xl border border-orange-100 bg-white px-4 py-5 shadow-sm"
+            >
+              <dt className="order-2 mt-1 text-xs text-gray-500">{s.label}</dt>
+              <dd className="text-2xl font-extrabold text-orange-600">
+                {s.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {/* Product tour */}
+      <section id="tour" className="mt-20 scroll-mt-20">
+        <h2 className="text-center text-3xl font-extrabold tracking-tight">
+          Take the tour
+        </h2>
+        <p className="mx-auto mt-2 max-w-xl text-center text-gray-600">
+          A look inside the live beta — scan, dashboard, and the dish
+          database.
+        </p>
+        <ProductTour />
+      </section>
+
+      {/* Features */}
+      <section className="mt-20">
+        <h2 className="text-center text-3xl font-extrabold tracking-tight">
+          Everything you need to eat smarter
+        </h2>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((f) => (
+            <div
+              key={f.title}
+              className="rounded-2xl border border-orange-100 bg-white p-6 shadow-sm transition hover:shadow-md"
+            >
+              <div className="text-4xl">{f.icon}</div>
+              <h3 className="mt-3 text-lg font-bold">{f.title}</h3>
+              <p className="mt-2 text-sm text-gray-600">{f.text}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* How it works */}
-      <section className="mt-16">
-        <h2 className="text-center text-2xl font-bold">How it works</h2>
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <section className="mt-20">
+        <h2 className="text-center text-3xl font-extrabold tracking-tight">
+          How it works
+        </h2>
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
           {STEPS.map((s, i) => (
             <div
               key={s.title}
@@ -73,19 +190,58 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="mt-16 rounded-3xl bg-gradient-to-br from-orange-600 to-amber-500 p-8 text-center text-white shadow-xl">
-        <h2 className="text-2xl font-extrabold">
+      {/* Waitlist */}
+      <section
+        id="waitlist"
+        className="mt-20 scroll-mt-20 rounded-3xl bg-gradient-to-br from-orange-600 to-amber-500 p-8 text-center text-white shadow-xl sm:p-12"
+      >
+        <h2 className="text-3xl font-extrabold">Be first at launch 🚀</h2>
+        <p className="mx-auto mt-3 max-w-md text-orange-50">
+          The beta is open right now — but join the waitlist for launch
+          updates and <strong>early access to Desi Cal Pro</strong> with
+          unlimited AI scans.
+        </p>
+        <div className="mt-6 rounded-2xl bg-white/95 p-6 text-gray-900 shadow-inner">
+          <WaitlistForm source="landing-v2" />
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="mx-auto mt-20 max-w-2xl">
+        <h2 className="text-center text-3xl font-extrabold tracking-tight">
+          Questions, answered
+        </h2>
+        <div className="mt-8 space-y-4">
+          {FAQS.map((f) => (
+            <details
+              key={f.q}
+              className="group rounded-2xl border border-orange-100 bg-white p-5 shadow-sm"
+            >
+              <summary className="cursor-pointer font-bold text-gray-900 marker:text-orange-500">
+                {f.q}
+              </summary>
+              <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                {f.a}
+              </p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="mt-20 text-center">
+        <h2 className="text-3xl font-extrabold tracking-tight">
           Tonight&apos;s dinner, decoded 🍽️
         </h2>
-        <p className="mx-auto mt-2 max-w-md text-orange-50">
-          Upload your first plate photo and see your calories in seconds.
+        <p className="mx-auto mt-3 max-w-md text-gray-600">
+          Create your free account and scan your first plate in under a
+          minute.
         </p>
         <Link
-          href="/track"
-          className="mt-6 inline-block rounded-full bg-white px-8 py-3 font-bold text-orange-700 hover:bg-orange-50"
+          href="/signup"
+          className="mt-6 inline-block rounded-full bg-orange-600 px-10 py-3.5 text-lg font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-700"
         >
-          Scan my first meal
+          Get started free →
         </Link>
       </section>
     </div>

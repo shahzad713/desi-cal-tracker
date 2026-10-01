@@ -103,7 +103,17 @@
 - [x] SECURITY: offline page + manifest + SW assets all public and user-agnostic (nothing user-scoped in cache); auth-gated routes still 307 to /login; no secrets in client bundle; SW scope `self.location.origin` only
 - [x] Smoke-tested: `/manifest.json` 200 JSON, `/sw.js` 200 JS, `/offline` 200 (no auth bounce), `/track` still 307 for anon; `npm run build` green
 
-## ⏳ Day 9 — Marketing landing v2 + waitlist
+## ✅ Day 9 — Marketing landing v2 + waitlist (2026-10-01)
+
+- [x] Landing rewrite (`app/page.tsx`): hero with live-beta badge + stats row (209 dishes, 4 macros, 15s scan, 100% private), product-tour section, 6-feature grid, how-it-works, waitlist CTA, FAQ (incl. honest accuracy disclaimer), final CTA
+- [x] `app/product-tour.tsx` — crafted product previews (scan result card, dashboard, dish database) with real demo data; honest "tour" copy, no fake screenshot claims (live browser screenshots impossible: sandbox Chromium hard-blocks local network access)
+- [x] `app/waitlist-form.tsx` — public waitlist form (name + email) with honeypot anti-spam field, success/duplicate/error states
+- [x] Prisma: `WaitlistSignup` model (unique lowercased email, optional name, allowlisted source) + migration `waitlist`
+- [x] `lib/waitlist.ts` — shared `processWaitlistSignup`: zod validation (email/name/source/honeypot), rate limits (5/hr per IP, 3/hr per email), duplicates return success (no address enumeration), no internals leaked
+- [x] `POST /api/waitlist` route sharing the same logic (200/400/429 JSON)
+- [x] SECURITY: public-by-design endpoint; zod on every input; honeypot; per-IP + per-email rate limits; email unique constraint; no secrets in responses
+- [x] Smoke-tested: valid → 200 {ok,already:false}; duplicate → 200 {already:true}; bad email/honeypot/bad JSON → 400; 6th signup in an hour → 429; landing renders all sections
+- [x] `npm run build` green
 
 ## ⏳ Day 10 — Stripe subscriptions (Pro = unlimited scans)
 
