@@ -228,6 +228,47 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Day 10 — simple pricing: Free vs Pro */}
+      <section className="mx-auto mt-20 max-w-3xl">
+        <h2 className="text-center text-3xl font-extrabold tracking-tight">
+          Free to start. Pro when you&apos;re hungry for more.
+        </h2>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-orange-100 bg-white p-6 shadow-sm">
+            <div className="text-sm font-bold uppercase tracking-wide text-gray-500">
+              Free
+            </div>
+            <div className="mt-1 text-3xl font-extrabold">Rs 0</div>
+            <ul className="mt-4 space-y-2 text-sm text-gray-600">
+              <li>📸 20 AI photo scans / hour</li>
+              <li>🍛 209-dish desi database</li>
+              <li>📊 Dashboard, history &amp; charts</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border-2 border-orange-500 bg-white p-6 shadow-sm">
+            <div className="text-sm font-bold uppercase tracking-wide text-orange-600">
+              ⚡ Pro
+            </div>
+            <div className="mt-1 text-3xl font-extrabold">Coming soon</div>
+            <ul className="mt-4 space-y-2 text-sm text-gray-600">
+              <li>♾️ Unlimited AI photo scans</li>
+              <li>🚀 Priority analysis queue</li>
+              <li>💛 Support the beta</li>
+            </ul>
+            <Link
+              href="/billing"
+              className="mt-5 inline-block rounded-full bg-orange-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-700"
+            >
+              See plans →
+            </Link>
+          </div>
+        </div>
+        <p className="mt-3 text-center text-xs text-gray-500">
+          Pro launches in test mode during the beta — no real charges until
+          launch day.
+        </p>
+      </section>
+
       {/* Final CTA */}
       <section className="mt-20 text-center">
         <h2 className="text-3xl font-extrabold tracking-tight">

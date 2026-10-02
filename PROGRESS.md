@@ -117,6 +117,23 @@
 
 ## ⏳ Day 10 — Stripe subscriptions (Pro = unlimited scans)
 
+## ✅ Day 10 — Stripe subscriptions, Pro = unlimited scans (2026-10-02)
+
+- [x] `stripe` SDK installed (server-side only; secret key never touches the browser)
+- [x] Prisma: `User.stripeCustomerId` (unique), `User.stripeSubscriptionId`, `User.isPro` (default false) + migration `stripe_billing`
+- [x] `lib/stripe.ts` — lazy server-only Stripe client, `subscriptionGrantsPro()` (only `active`/`trialing` count as Pro), graceful "not configured" errors
+- [x] `lib/billing.ts` — `getBillingStatus(userId)`; the single source of truth is `User.isPro`, set only by webhooks
+- [x] `POST /api/stripe/webhook` — raw-body signature verification with `STRIPE_WEBHOOK_SECRET`; handles `checkout.session.completed`, `customer.subscription.created/updated/deleted`; user linked by Stripe customer id or cuid-validated session metadata; Pro granted ONLY from the subscription's authoritative status (canceled/past_due → revoked)
+- [x] `POST /api/stripe/checkout` — auth required, rate-limited 10/hr/user; price id from server env (client can't swap prices); reuses existing Stripe customer (no dupes); userId stamped in metadata; 409 if already Pro
+- [x] `POST /api/stripe/portal` — auth required; customer id read from OUR user row, never the request body; hosted portal for card/invoice/cancel
+- [x] New protected `/billing` page (middleware matcher extended): plan card, scan budget (Free 20/hr vs Pro ∞), upgrade/manage buttons, `?upgraded=` / `?canceled=` banners; price label read live from Stripe; "not configured" fallback state
+- [x] `analyzePhoto` — Pro users skip the per-user 20/hr scan bucket (unlimited scans); per-IP 60/hr abuse backstop stays for everyone; Free-plan limit error points to /billing
+- [x] Landing: Free-vs-Pro pricing section; desktop nav "⚡ Pro" link; profile page plan row + Go Pro/Manage button
+- [x] `.env.example` — STRIPE_SECRET_KEY / STRIPE_PRICE_ID / STRIPE_WEBHOOK_SECRET / NEXT_PUBLIC_APP_URL (test mode); nothing secret committed
+- [x] SECURITY: webhook signature-verified (unsigned/forged bodies rejected, verified 400/400); never trust client payment claims; auth + rate limits on checkout/portal; anon → 307/401 everywhere; Pro derived only from Stripe subscription status
+- [x] Smoke-tested: anon `/billing` → 307; anon checkout → 401; webhook no signature → 400, bad signature → 400, unconfigured → 503; `npm run build` green
+- [x] Test-mode only — Shahzad wires real keys (Stripe dashboard) before Day 14 deploy; webhook endpoint to register: `/api/stripe/webhook`
+
 ## ⏳ Day 11 — Shareable daily-summary image
 
 ## ⏳ Day 12 — Admin panel

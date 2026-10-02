@@ -99,6 +99,12 @@ async function Nav() {
                 >
                   Dishes
                 </Link>
+                <Link
+                  href="/billing"
+                  className="rounded-full px-4 py-2 font-bold text-orange-700 hover:bg-orange-50"
+                >
+                  ⚡ Pro
+                </Link>
               </div>
               <Link
                 href="/profile"

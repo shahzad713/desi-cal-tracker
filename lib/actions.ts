@@ -10,6 +10,7 @@ import { prisma } from "./db";
 import { requireUserId } from "./auth-actions";
 import { analyzeFoodImage, type FoodAnalysis, type AnalysisMode } from "./analyzeFood";
 import { checkRateLimit, clientIp } from "./rateLimit";
+import { getBillingStatus } from "./billing";
 
 export interface AnalyzeResult {
   analysis: FoodAnalysis;
@@ -17,9 +18,10 @@ export interface AnalyzeResult {
   mode: AnalysisMode; // "gemini" when real AI answered, "demo" on fallback
 }
 
-// Scan budget: 20 scans/hour per user, 60/hour per IP. Keeps Gemini costs and
-// abuse under control. Buckets are in-memory (per-instance); Day 14 moves to
-// Redis/Upstash.
+// Scan budget: 20 scans/hour per user on the Free plan, 60/hour per IP for
+// everyone (infra abuse backstop). PRO USERS skip the per-user bucket —
+// unlimited scans is the whole point of Pro. Buckets are in-memory
+// (per-instance); Day 14 moves to Redis/Upstash.
 const SCANS_PER_HOUR_PER_USER = 20;
 const SCANS_PER_HOUR_PER_IP = 60;
 const HOUR_MS = 60 * 60 * 1000;
@@ -67,9 +69,17 @@ export async function analyzePhoto(formData: FormData): Promise<AnalyzeResult> {
   // Identity check first: no anonymous uploads, ever.
   const userId = await requireUserId();
 
-  // SECURITY: rate-limit the AI scan path per user and per IP.
-  if (!checkRateLimit(`scan:${userId}`, SCANS_PER_HOUR_PER_USER, HOUR_MS)) {
-    throw new Error("Too many scans — please wait a bit and try again.");
+  // SECURITY: rate-limit the AI scan path per user and per IP. Pro users get
+  // unlimited scans (the per-user bucket is skipped for them); the per-IP
+  // bucket still applies to everyone as an infrastructure abuse backstop.
+  const { isPro } = await getBillingStatus(userId);
+  if (
+    !isPro &&
+    !checkRateLimit(`scan:${userId}`, SCANS_PER_HOUR_PER_USER, HOUR_MS)
+  ) {
+    throw new Error(
+      "You've hit the Free plan's 20 scans/hour — upgrade to Pro on the Billing page for unlimited scans."
+    );
   }
   const ip = clientIp(headers());
   if (!checkRateLimit(`scan:ip:${ip}`, SCANS_PER_HOUR_PER_IP, HOUR_MS)) {

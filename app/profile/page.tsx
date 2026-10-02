@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import SignOutButton from "./SignOutButton";
@@ -16,7 +17,13 @@ export default async function ProfilePage() {
   const [user, entryCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true, email: true, createdAt: true, image: true },
+      select: {
+        name: true,
+        email: true,
+        createdAt: true,
+        image: true,
+        isPro: true,
+      },
     }),
     prisma.foodEntry.count({ where: { userId: session.user.id } }),
   ]);
@@ -67,6 +74,23 @@ export default async function ProfilePage() {
             </dd>
           </div>
         </dl>
+
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
+          <div className="text-sm">
+            <span className="font-bold text-gray-800">
+              {user.isPro ? "✨ Pro plan" : "Free plan"}
+            </span>
+            <span className="text-gray-500">
+              {user.isPro ? " · unlimited AI scans" : " · 20 AI scans/hour"}
+            </span>
+          </div>
+          <Link
+            href="/billing"
+            className="rounded-full bg-orange-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-orange-700"
+          >
+            {user.isPro ? "Manage" : "Go Pro"}
+          </Link>
+        </div>
 
         <div className="mt-6">
           <SignOutButton />
