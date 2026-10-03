@@ -136,6 +136,18 @@
 
 ## ⏳ Day 11 — Shareable daily-summary image
 
+## ✅ Day 11 — Sharing: shareable daily-summary links + referral basics (2026-10-03)
+
+- [x] Prisma: `ShareLink` model (unguessable 43-char 256-bit base64url token, userId FK cascade, YYYY-MM-DD date, frozen JSON `payload` snapshot, viewCount) + `User.referralCode` (unique, 8-char) / `referredById` self-relation + migration `share_referral`
+- [x] `lib/share.ts` server actions: `createShareLink(date)` (auth, zod date, 20/hr per-user rate limit, snapshot built server-side from the caller's own entries, refuses empty days), `deleteShareLink(id)` (ownership-checked revoke), `getShareLinks()`, `getShareData()` / `getShareSnapshot()` (public, strict token-format validation, unknown tokens → null, snapshot schema re-validated on read), `ensureReferralCode()` (lazy unique backfill with P2002 retry), `getReferralInfo()`
+- [x] Public `/share/[token]` page (NOT behind auth — token is the credential): gradient summary card (date, big kcal, macro bars, meal list with Urdu names + times), dynamic OG/Twitter meta, "Track your own food" CTA carrying the owner's referral code; unknown/malformed tokens → 404
+- [x] `GET /api/share/[token]/og` — 1200×630 PNG social card via `next/og` ImageResponse (node runtime, committed Inter TTFs under `public/fonts/`, no runtime font fetch, no emoji); wired as og:image/twitter:image
+- [x] Protected `/share` management page (page-level auth, like /profile): date picker → create link, copy buttons (clipboard + fallback), per-link view counts, revoke; referral card with invite link (`/signup?ref=CODE`) + friends-joined count
+- [x] Referrals: `register` accepts optional `ref` (strict 8-char, unknown codes silently ignored — no code enumeration), sets `referredById`; every new account gets its own code; `SignupForm` carries `?ref=` through a hidden field (Suspense-wrapped page)
+- [x] Dashboard "🔗 Share today" button; nav "Share" link; profile referral card; footer bumped to Day 11
+- [x] SECURITY: public page exposes ONLY the frozen snapshot + public referral code — no name/email/userId; tokens unguessable + format-validated; snapshots immutable (later edits/deletes don't alter shared links — revoke instead); create endpoint rate-limited; all inputs zod-validated
+- [x] Smoke-tested: anon `/share` → 307 /login; bad/malformed token → 404 (page + OG); good token → 200 with correct totals, no email in HTML, referral CTA present; OG → 200 image/png 1200×630 (visually verified); `npm run build` green
+
 ## ⏳ Day 12 — Admin panel
 
 ## ⏳ Day 13 — Performance / SEO / Sentry polish

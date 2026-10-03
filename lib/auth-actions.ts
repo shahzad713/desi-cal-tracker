@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
@@ -28,6 +29,14 @@ const registerSchema = z.object({
     .string()
     .min(8, "Password must be at least 8 characters")
     .max(128, "Password is too long"),
+  // Day 11: optional referral code (?ref= on the signup URL). Validated as a
+  // strict 8-char code; unknown/invalid codes are silently ignored below —
+  // signup never reveals whether a code exists.
+  ref: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{8}$/)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 });
 
 export interface RegisterState {
@@ -49,6 +58,7 @@ export async function register(
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    ref: formData.get("ref"),
   });
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
@@ -62,14 +72,53 @@ export async function register(
     return { error: "Could not create the account. Try signing in instead." };
   }
 
+  // Day 11: attribute the referral when ?ref= names a real code. A miss is
+  // silent — we never confirm or deny that a code exists.
+  let referredById: string | undefined;
+  if (parsed.data.ref) {
+    const referrer = await prisma.user.findUnique({
+      where: { referralCode: parsed.data.ref },
+      select: { id: true },
+    });
+    if (referrer) referredById = referrer.id;
+  }
+
+  // Every new account gets its own unguessable referral code up front.
+  // (A freak unique-collision is retried once in the P2002 catch below.)
+  const referralCode = randomBytes(6).toString("base64url"); // 8 chars
+
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
-  await prisma.user.create({
-    data: {
-      name: parsed.data.name,
-      email: parsed.data.email,
-      passwordHash,
-    },
-  });
+  try {
+    await prisma.user.create({
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        passwordHash,
+        referralCode,
+        referredById,
+      },
+    });
+  } catch (err) {
+    // P2002 on referralCode = freak collision; retry once with a fresh code.
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2002"
+    ) {
+      await prisma.user.create({
+        data: {
+          name: parsed.data.name,
+          email: parsed.data.email,
+          passwordHash,
+          referralCode: randomBytes(9).toString("base64url"), // 12 chars
+          referredById,
+        },
+      });
+    } else {
+      throw err;
+    }
+  }
 
   redirect("/login?registered=1");
 }

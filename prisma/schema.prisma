@@ -1,4 +1,4 @@
-// Desi Cal AI — Prisma schema (Day 10)
+// Desi Cal AI — Prisma schema (Day 11)
 // Dev database: SQLite (DATABASE_URL="file:./dev.db").
 // DAY 14: switch `provider` to "postgresql" and point DATABASE_URL at Neon.
 // The schema deliberately uses only cross-compatible features (cuid(), Float,
@@ -36,6 +36,32 @@ model User {
   stripeCustomerId     String?  @unique
   stripeSubscriptionId String?
   isPro                Boolean  @default(false)
+  // Day 11: referrals. referralCode is the user's public invite code
+  // (unguessable 8-char base64url); referredById records who invited them.
+  referralCode String? @unique
+  referredById String?
+  referredBy   User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    User[]  @relation("Referrals")
+  shareLinks   ShareLink[]
+}
+
+// Day 11: shareable daily-summary links. A ShareLink carries a frozen
+// snapshot of one day's totals + entries — the public /share/[token] page
+// renders ONLY this snapshot, never the user's account row (no name, email
+// or userId is ever exposed through a shared link). The token is 256-bit
+// random base64url: unguessable, and validated strictly before lookup.
+model ShareLink {
+  id        String   @id @default(cuid())
+  token     String   @unique // 43-char base64url, generated server-side
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String // YYYY-MM-DD, the summarized day
+  payload   String // JSON snapshot: totals + entry list (see lib/share.ts)
+  viewCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 // --- Auth.js (NextAuth v5) models — required by @auth/prisma-adapter ---

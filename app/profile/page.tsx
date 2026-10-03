@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { getReferralInfo } from "@/lib/share";
 import SignOutButton from "./SignOutButton";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const [user, entryCount] = await Promise.all([
+  const [user, entryCount, referral] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
@@ -26,6 +27,7 @@ export default async function ProfilePage() {
       },
     }),
     prisma.foodEntry.count({ where: { userId: session.user.id } }),
+    getReferralInfo(),
   ]);
   if (!user) redirect("/login");
 
@@ -90,6 +92,29 @@ export default async function ProfilePage() {
           >
             {user.isPro ? "Manage" : "Go Pro"}
           </Link>
+        </div>
+
+        {/* Day 11: referrals — invite link + friends-joined count */}
+        <div className="mt-4 rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm">
+              <span className="font-bold text-gray-800">🎁 Invite friends</span>
+              <span className="text-gray-500">
+                {" "}
+                · {referral.referredCount}{" "}
+                {referral.referredCount === 1 ? "friend" : "friends"} joined
+              </span>
+            </div>
+            <Link
+              href="/share"
+              className="rounded-full bg-orange-100 px-4 py-1.5 text-sm font-bold text-orange-800 hover:bg-orange-200"
+            >
+              Get invite link
+            </Link>
+          </div>
+          <code className="mt-2 block truncate text-xs text-gray-500">
+            Your code: {referral.code}
+          </code>
         </div>
 
         <div className="mt-6">

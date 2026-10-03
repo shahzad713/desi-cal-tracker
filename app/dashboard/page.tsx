@@ -79,6 +79,13 @@ export default async function DashboardPage() {
         🔥 {stats.streaks.current}-day streak · 🎯{" "}
         {stats.dailyCalorieTarget.toLocaleString()} kcal target
       </Link>
+      {/* Day 11: one-tap share of today's summary */}
+      <Link
+        href="/share"
+        className="ml-2 mt-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-1.5 text-sm font-semibold text-orange-800 shadow-sm hover:bg-orange-50"
+      >
+        🔗 Share today
+      </Link>
 
       {/* Totals card */}
       <div className="mt-6 rounded-2xl border border-orange-100 bg-white p-6 shadow-sm">

@@ -100,6 +100,12 @@ async function Nav() {
                   Dishes
                 </Link>
                 <Link
+                  href="/share"
+                  className="rounded-full px-4 py-2 text-gray-700 hover:bg-orange-50"
+                >
+                  Share
+                </Link>
+                <Link
                   href="/billing"
                   className="rounded-full px-4 py-2 font-bold text-orange-700 hover:bg-orange-50"
                 >
@@ -195,7 +201,7 @@ export default function RootLayout({
         <PwaBoot />
         <MobileTabs />
         <footer className="border-t border-orange-100 py-6 text-center text-xs text-gray-500">
-          Desi Cal AI — Day 8 build · installable PWA
+          Desi Cal AI — Day 11 build · shareable daily summaries
         </footer>
       </body>
     </html>

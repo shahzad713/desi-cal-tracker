@@ -1,13 +1,19 @@
 "use client";
 
 import { useFormState } from "react-dom";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { register, type RegisterState } from "@/lib/auth-actions";
 
 const initialState: RegisterState = {};
 
+// Day 11: ?ref=CODE on the signup URL is carried through as a hidden field
+// so the new account is attributed to the referrer. The server validates the
+// code strictly and ignores unknown ones silently.
 export default function SignupForm() {
   const [state, formAction, isPending] = useFormState(register, initialState);
+  const searchParams = useSearchParams();
+  const ref = searchParams.get("ref") ?? "";
 
   return (
     <div className="pt-10">
@@ -27,6 +33,7 @@ export default function SignupForm() {
         )}
 
         <form action={formAction} className="mt-6 space-y-4">
+          <input type="hidden" name="ref" value={ref} />
           <div>
             <label htmlFor="name" className="text-sm font-semibold text-gray-700">
               Name
