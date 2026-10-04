@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+import { isAdminUser } from "@/lib/admin";
 import PwaBoot from "./pwa-boot";
 import "./globals.css";
 
@@ -50,6 +51,9 @@ export const viewport: Viewport = {
 
 async function Nav() {
   const session = await auth();
+  // Day 12: show the Admin link only to admins (nav is server-rendered, so
+  // this is a cheap boolean — no role info leaks to non-admins).
+  const showAdmin = session?.user ? await isAdminUser() : false;
 
   return (
     <header className="border-b border-orange-100 bg-white/80 backdrop-blur sticky top-0 z-10">
@@ -111,6 +115,15 @@ async function Nav() {
                 >
                   ⚡ Pro
                 </Link>
+                {/* Day 12: admin link — rendered only for admins. */}
+                {showAdmin ? (
+                  <Link
+                    href="/admin"
+                    className="rounded-full bg-purple-100 px-4 py-2 font-bold text-purple-800 hover:bg-purple-200"
+                  >
+                    🛡️ Admin
+                  </Link>
+                ) : null}
               </div>
               <Link
                 href="/profile"
@@ -201,7 +214,7 @@ export default function RootLayout({
         <PwaBoot />
         <MobileTabs />
         <footer className="border-t border-orange-100 py-6 text-center text-xs text-gray-500">
-          Desi Cal AI — Day 11 build · shareable daily summaries
+          Desi Cal AI — Day 12 build · admin panel
         </footer>
       </body>
     </html>

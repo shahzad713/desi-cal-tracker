@@ -150,6 +150,16 @@
 
 ## ⏳ Day 12 — Admin panel
 
+## ✅ Day 12 — Admin panel: users, entries, stats + audit log (2026-10-04)
+
+- [x] Prisma: `User.isAdmin` (default false) + new `AuditLog` model (actorId/actorEmail, action allowlist, targetType/targetId, JSON detail, timestamps) + migration `admin_panel`
+- [x] `lib/admin.ts` — `requireAdmin()` gate (session + fresh DB role lookup; `ADMIN_EMAILS` server-env bootstrap so the first admin can exist); `logAudit()` on every mutation; `getAdminStats()` (users total/today/7d, Pro, admins, entries total/today, waitlist, share links, 24h audit events); `listAdminUsers()` (search name/email, 20/page, explicit select — passwordHash/Stripe ids never returned); `getAdminUserDetail()` (profile, 20 recent entries, 10 recent admin actions on the user); `setAdmin()` grant/revoke (zod cuid + enum, 60/min per-admin rate limit, cannot self-demote, writes audit row); `listAuditLog()` (30/page)
+- [x] `/admin` dashboard (stat cards), `/admin/users` (search + pagination), `/admin/users/[id]` (detail + grant/revoke toggle with confirm), `/admin/audit` (audit table) — all behind `app/admin/layout.tsx` gate that redirects non-admins home
+- [x] Edge middleware matcher extended with `/admin/:path*` (anon → 307 /login); nav shows a 🛡️ Admin link only to admins (server-rendered, no role leak); footer bumped to Day 12; `.env.example` documents `ADMIN_EMAILS`
+- [x] SECURITY: role checked on every admin page AND every admin action (DB lookup, never a stale token claim); all admin mutations audit-logged with actor + target + timestamp; explicit selects everywhere (no passwordHash exposure); zod on all inputs; admin actions rate-limited; non-admin signed-in users get a clean redirect, not an error page
+- [x] Smoke-tested: anon `/admin`, `/admin/users`, `/admin/audit` → 307 /login; bootstrap-admin sign-in → 200 on all admin pages incl. user detail; non-admin sign-in → 307 to `/`; grant+audit DB writes verified at the schema level (role persisted, audit row with `admin.grant` recorded). (Raw server-action POST from curl wasn't exercisable in the sandbox — "Connection closed" transport quirk — the form uses the same proven useFormState pattern as signup/goals; click-through should be confirmed in a real browser.)
+- [x] `npm run build` green
+
 ## ⏳ Day 13 — Performance / SEO / Sentry polish
 
 ## ⏳ Day 14 — Vercel deploy + Postgres (Neon)

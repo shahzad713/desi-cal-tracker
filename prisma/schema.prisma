@@ -1,4 +1,4 @@
-// Desi Cal AI — Prisma schema (Day 11)
+// Desi Cal AI — Prisma schema (Day 12)
 // Dev database: SQLite (DATABASE_URL="file:./dev.db").
 // DAY 14: switch `provider` to "postgresql" and point DATABASE_URL at Neon.
 // The schema deliberately uses only cross-compatible features (cuid(), Float,
@@ -43,6 +43,28 @@ model User {
   referredBy   User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals    User[]  @relation("Referrals")
   shareLinks   ShareLink[]
+  // Day 12: admin panel. isAdmin is a persisted grant set ONLY by other
+  // admins (lib/admin.ts). A second bootstrap path exists for first setup:
+  // ADMIN_EMAILS (server env, comma-separated) — requireAdmin() treats a
+  // user whose email is listed there as admin. Never exposed to clients.
+  isAdmin Boolean @default(false)
+}
+
+// Day 12: admin audit log. Every mutating admin action (grant/revoke role,
+// etc.) writes a row here with actor + target + detail. Readable only by
+// admins. Details never contain secrets or password material.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorEmail String
+  action     String // allowlist: admin.grant | admin.revoke
+  targetType String? // e.g. "user"
+  targetId   String?
+  detail     String? // short JSON string, no sensitive values
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([createdAt])
 }
 
 // Day 11: shareable daily-summary links. A ShareLink carries a frozen
