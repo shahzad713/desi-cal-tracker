@@ -18,6 +18,7 @@
 //     upload path (defense in depth).
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { reportError } from "./errors";
 import { z } from "zod";
 
 export interface FoodAnalysis {
@@ -192,11 +193,9 @@ export async function analyzeFoodImage(
   } catch (err) {
     // Graceful fallback: any Gemini failure (no key, rate limit, outage,
     // timeout, bad response) degrades to demo instead of breaking the app.
-    // Never log the key or the image.
-    console.warn(
-      "[analyzeFood] Gemini failed, falling back to demo mode:",
-      err instanceof Error ? err.message : "unknown error"
-    );
+    // Never log the key or the image. Day 13: route failures through the
+    // error reporter so recurring Gemini outages surface in Sentry.
+    reportError(err, { route: "analyzeFood", operation: "gemini-vision" });
     return { analysis: demoAnalyze(), mode: "demo" };
   }
 }

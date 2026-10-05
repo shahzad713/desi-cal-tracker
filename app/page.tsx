@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import WaitlistForm from "./waitlist-form";
 import ProductTour from "./product-tour";
 
 // Day 9 — marketing landing v2: product tour, feature grid, FAQ, launch waitlist.
+
+// Day 13: the landing is the ONE public indexable page — explicitly opt back
+// into indexing (the root layout noindexes everything else by default).
+export const metadata: Metadata = {
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/" },
+};
 
 const STATS = [
   { value: "209", label: "desi dishes in the database" },
@@ -82,8 +90,23 @@ const FAQS = [
 ];
 
 export default function Home() {
+  // Day 13 — structured data for search engines (SoftwareApplication).
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Desi Cal AI",
+    applicationCategory: "HealthApplication",
+    operatingSystem: "Web",
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    description:
+      "AI calorie tracker for desi food: snap a photo of your plate and get instant calorie + macro estimates for Pakistani & Indian dishes.",
+  };
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Hero */}
       <section className="pt-12 text-center sm:pt-16">
         <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-4 py-1.5 text-sm font-semibold text-orange-700">

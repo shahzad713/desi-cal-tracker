@@ -160,8 +160,21 @@
 - [x] Smoke-tested: anon `/admin`, `/admin/users`, `/admin/audit` → 307 /login; bootstrap-admin sign-in → 200 on all admin pages incl. user detail; non-admin sign-in → 307 to `/`; grant+audit DB writes verified at the schema level (role persisted, audit row with `admin.grant` recorded). (Raw server-action POST from curl wasn't exercisable in the sandbox — "Connection closed" transport quirk — the form uses the same proven useFormState pattern as signup/goals; click-through should be confirmed in a real browser.)
 - [x] `npm run build` green
 
-## ⏳ Day 13 — Performance / SEO / Sentry polish
-
+## ✅ Day 13 — Security audit + hardening (2026-10-05)
 ## ⏳ Day 14 — Vercel deploy + Postgres (Neon)
 
 ## ⏳ Day 15 — Launch kit + final QA
+
+## ✅ Day 13 — Security audit + hardening (2026-10-05)
+
+- [x] **Dependency audit (npm audit blocked by sandbox policy → advisory research):** next-auth 5.0.0-beta.29 → **5.0.0-beta.32** — patches the July-2026 batch of 4 advisories incl. CVE-2026-73421 CRITICAL (auth() fail-open on server config errors), CVE-2026-73419/73420/73418; @auth/prisma-adapter → 2.11.3, @auth/core → 0.41.3. CVE-2026-94545 (next/og RCE) assessed: advisory range is Next.js ≥16.2.0 <16.3.6 — NOT affected on 14.2.35 (latest 14.2.x). zod/stripe/prisma/recharts/bcryptjs/@google/generative-ai/react: no advisories on installed versions.
+- [x] **CSP finalized** (`next.config.mjs`): default-src 'self', script/style 'self'+'unsafe-inline' (Next.js/Tailwind/recharts need), img-src self+data:+blob:+Google avatars, connect-src self+Sentry ingest, object-src 'none', base-uri 'self', form-action 'self', frame-ancestors 'none', worker-src 'self', upgrade-insecure-requests. Plus `poweredByHeader: false`. Verified served on every response by the audit.
+- [x] **Rate-limit hardening:** bucket Map capped at 10k keys (oldest evicted — unbounded growth was a memory-exhaustion vector); Stripe webhook now rate-limited 60/min/IP (public endpoint flood protection on top of signature verification).
+- [x] **OG renderer hardening** (`lib/sanitize.ts`): every user-controlled string (dish names from users/Gemini) is XML-escaped, control-char-stripped, and length-capped before reaching satori/ImageResponse; counts coerced to safe non-negative ints.
+- [x] **Sentry error tracking:** @sentry/nextjs 11 wired (client/server/edge configs) — fully DORMANT without DSNs (Shahzad adds them Day 14); `lib/errors.ts` reportError funnel (labels only, never user data); `app/error.tsx` + `app/global-error.tsx` recovery boundaries.
+- [x] **Performance pass:** recharts code-split off /charts initial payload (`next/dynamic` ssr:false + skeleton); profile avatar deliberately stays a plain `<img>` (no next/image remote optimization → that attack surface stays off).
+- [x] **SEO:** `robots.ts` (private paths disallowed), `sitemap.ts` (only public pages; share tokens + API excluded), metadataBase + OG/Twitter cards, landing explicitly indexable + canonical + SoftwareApplication JSON-LD; all private pages noindexed via root layout.
+- [x] **`npm test` = runnable security audit** (`scripts/security-audit.ts`, 52 checks): static (no .env in git, NEXT_PUBLIC_ allowlist, middleware 9/9 routes, private API routes all authed, headers, next-auth floor, no raw SQL, Sentry dormant), DB ownership on a throwaway SQLite DB (forged delete/update = 0 rows, owner ops = 1 row), live HTTP vs `next start` (9 auth 307s, CSP/XFO/nosniff served, X-Powered-By gone, 404s, waitlist honeypot→400/bad-email→400/6th→429, webhook unsigned→400/flood→429, robots/sitemap hygiene). **52/52 green.**
+- [x] `SECURITY.md` — standing checklist + audit findings + honest residual-risk list (in-memory limits → Redis Day 14; Next 15/16 migration deferred).
+- [x] `.env.example` documents SENTRY_DSN / NEXT_PUBLIC_SENTRY_DSN
+- [x] `npm run build` green

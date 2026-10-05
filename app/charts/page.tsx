@@ -1,13 +1,40 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { getNutritionSeries } from "@/lib/actions";
 import { CHART_RANGES, type DayStats } from "@/lib/nutrition";
-import { CaloriesChart, MacroDonut, MacroStackChart } from "./Charts";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Charts — Desi Cal AI",
 };
+
+// Day 13 (perf): recharts is the heaviest client dependency in the app.
+// Code-split it off the initial /charts payload — the server-rendered stats
+// and skeleton paint first, charts stream in after.
+const CaloriesChart = nextDynamic(
+  () => import("./Charts").then((m) => m.CaloriesChart),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+const MacroDonut = nextDynamic(() => import("./Charts").then((m) => m.MacroDonut), {
+  loading: () => <ChartSkeleton short />,
+  ssr: false,
+});
+const MacroStackChart = nextDynamic(
+  () => import("./Charts").then((m) => m.MacroStackChart),
+  { loading: () => <ChartSkeleton short />, ssr: false }
+);
+
+function ChartSkeleton({ short = false }: { short?: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className={`w-full animate-pulse rounded-xl bg-orange-50 ${
+        short ? "h-48" : "h-64"
+      }`}
+    />
+  );
+}
 
 function Card({
   title,

@@ -22,8 +22,16 @@ import {
   getStripe,
   subscriptionGrantsPro,
 } from "@/lib/stripe";
+import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
+
+// Day 13: the webhook is a PUBLIC endpoint (Stripe calls it). Signature
+// verification is the real auth, but a flood of forged events still costs CPU
+// (each one runs constructEvent + a DB lookup before failing). A generous
+// per-IP bucket blunts event-flood abuse without ever blocking Stripe's
+// legitimate retry pattern (a handful of deliveries per minute).
+const WEBHOOK_EVENTS_PER_MINUTE_PER_IP = 60;
 
 const metadataUserIdSchema = z.object({
   userId: z.string().cuid(),
@@ -71,6 +79,18 @@ async function applySubscriptionState(
 }
 
 export async function POST(req: Request): Promise<Response> {
+  // Rate-limit before doing any crypto/DB work (see note above).
+  const ip = clientIp(req.headers);
+  if (
+    !checkRateLimit(
+      `webhook:${ip}`,
+      WEBHOOK_EVENTS_PER_MINUTE_PER_IP,
+      60 * 1000
+    )
+  ) {
+    return Response.json({ error: "Too many requests." }, { status: 429 });
+  }
+
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
     // Misconfigured server must not silently accept unsigned events.

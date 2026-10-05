@@ -10,6 +10,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "fs/promises";
 import path from "path";
 import { getShareData } from "@/lib/share";
+import { sanitizeForMarkup, sanitizeCount } from "@/lib/sanitize";
 
 export const dynamic = "force-dynamic";
 
@@ -48,14 +49,26 @@ export async function GET(
   }
   const { payload } = data;
   const t = payload.totals;
+  // Day 13: dish names are user-controlled (typed or AI-generated) and this
+  // route renders them into SVG via satori. Sanitize EVERY dynamic string
+  // before it touches the renderer — defense in depth against SVG markup
+  // injection (cf. GHSA-wx4j-mvgx-mqwp).
   const niceDate = new Date(payload.date + "T12:00:00").toLocaleDateString(
     "en-PK",
     { weekday: "long", day: "numeric", month: "long", year: "numeric" }
   );
-  const topItems = payload.items.slice(0, 4);
+  const calories = sanitizeCount(t.calories);
+  const protein = sanitizeCount(Math.round(t.protein));
+  const carbs = sanitizeCount(Math.round(t.carbs));
+  const fat = sanitizeCount(Math.round(t.fat));
+  const entries = sanitizeCount(t.entries);
+  const topItems = payload.items.slice(0, 4).map((item) => ({
+    dish: sanitizeForMarkup(item.dish),
+    calories: sanitizeCount(item.calories),
+  }));
   // Single string (not multiple JSX children) — satori requires an explicit
   // display:flex on any <div> with more than one child node.
-  const footerLine = `${t.entries} ${t.entries === 1 ? "meal" : "meals"} tracked with AI · desi food, decoded`;
+  const footerLine = `${entries} ${entries === 1 ? "meal" : "meals"} tracked with AI · desi food, decoded`;
 
   let fonts;
   try {
@@ -93,14 +106,14 @@ export async function GET(
             <div style={{ fontSize: 28, opacity: 0.85 }}>{niceDate}</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 8 }}>
               <span style={{ fontSize: 120, fontWeight: 800, lineHeight: 1 }}>
-                {t.calories.toLocaleString()}
+                {calories.toLocaleString()}
               </span>
               <span style={{ fontSize: 40, fontWeight: 700 }}>kcal</span>
             </div>
             <div style={{ display: "flex", gap: 32, marginTop: 20, fontSize: 30, fontWeight: 700 }}>
-              <span>{Math.round(t.protein)}g protein</span>
-              <span>{Math.round(t.carbs)}g carbs</span>
-              <span>{Math.round(t.fat)}g fat</span>
+              <span>{protein}g protein</span>
+              <span>{carbs}g carbs</span>
+              <span>{fat}g fat</span>
             </div>
           </div>
         </div>

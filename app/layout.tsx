@@ -18,9 +18,50 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Desi Cal AI — AI calorie tracker for desi food",
+  // Day 13: absolute URLs for OG/Twitter cards come from the deployed origin.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://desi-cal-ai.example.com"
+  ),
+  title: {
+    default: "Desi Cal AI — AI calorie tracker for desi food",
+    template: "%s — Desi Cal AI",
+  },
   description:
-    "Snap a photo of your plate and get instant calorie + macro estimates for Pakistani & Indian dishes.",
+    "Snap a photo of your plate and get instant calorie + macro estimates for Pakistani & Indian dishes. 209-dish database, private by design.",
+  keywords: [
+    "desi food",
+    "calorie tracker",
+    "Pakistani food calories",
+    "Indian food calories",
+    "AI nutrition",
+    "macro tracker",
+  ],
+  authors: [{ name: "Desi Cal AI" }],
+  openGraph: {
+    type: "website",
+    siteName: "Desi Cal AI",
+    title: "Desi Cal AI — AI calorie tracker for desi food",
+    description:
+      "Snap a photo of your plate, get instant calories + macros for desi dishes.",
+    images: [
+      {
+        url: "/icons/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "Desi Cal AI",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Desi Cal AI — AI calorie tracker for desi food",
+    description:
+      "Snap a photo of your plate, get instant calories + macros for desi dishes.",
+    images: ["/icons/icon-512.png"],
+  },
+  // Day 13: auth-gated + private pages must never be indexed. Public pages
+  // (landing, offline) override this with their own index:true metadata.
+  robots: { index: false, follow: false },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -214,7 +255,7 @@ export default function RootLayout({
         <PwaBoot />
         <MobileTabs />
         <footer className="border-t border-orange-100 py-6 text-center text-xs text-gray-500">
-          Desi Cal AI — Day 12 build · admin panel
+          Desi Cal AI — Day 13 build · security audit + hardening
         </footer>
       </body>
     </html>

@@ -9,6 +9,19 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>();
 
+// Day 13: hard cap on tracked keys. An unbounded Map is a memory-exhaustion
+// vector (an attacker cycling IPs/X-Forwarded-For could grow it forever).
+// When the cap is hit, the OLDEST key is evicted (Map preserves insertion
+// order) — worst case, an evicted legitimate key gets a fresh bucket, which
+// fails OPEN only for that key's counter, never for auth itself.
+const MAX_BUCKETS = 10_000;
+
+function evictIfNeeded() {
+  if (buckets.size < MAX_BUCKETS) return;
+  const oldest = buckets.keys().next();
+  if (!oldest.done) buckets.delete(oldest.value);
+}
+
 /**
  * Returns true if the call is allowed, false if the key is over its limit.
  * @param key e.g. `login:1.2.3.4`
@@ -24,6 +37,7 @@ export function checkRateLimit(
   const bucket = buckets.get(key);
 
   if (!bucket || now >= bucket.resetAt) {
+    evictIfNeeded();
     buckets.set(key, { count: 1, resetAt: now + windowMs });
     return true;
   }
