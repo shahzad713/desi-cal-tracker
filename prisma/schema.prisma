@@ -1,16 +1,21 @@
-// Desi Cal AI — Prisma schema (Day 12)
-// Dev database: SQLite (DATABASE_URL="file:./dev.db").
-// DAY 14: switch `provider` to "postgresql" and point DATABASE_URL at Neon.
-// The schema deliberately uses only cross-compatible features (cuid(), Float,
-// DateTime, no SQLite-only tricks) so the Day-14 migration is a one-line change.
+// Desi Cal AI — Prisma schema (Day 14)
+// Production database: Neon Postgres.
+// DATABASE_URL = Neon's pooled connection string (what the app uses at runtime)
+// DIRECT_URL   = Neon's direct (non-pooled) connection string (used by
+//                `prisma db push` only).
+// Local dev also points at Neon now — no local Postgres needed.
+// Legacy note: Days 1–13 ran on SQLite; the old sqlite migration history is
+// archived under prisma/migrations.sqlite-archive/ (reference only).
+// Prod schema is managed with `prisma db push`, not `prisma migrate`.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {

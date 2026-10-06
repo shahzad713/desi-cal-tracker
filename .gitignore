@@ -44,3 +44,6 @@ next-env.d.ts
 
 # scratch logs
 /logs/
+
+# Day 14: security-audit temp schemas (deleted after each run)
+prisma/.audit-tmp-*.prisma

@@ -163,6 +163,18 @@
 ## ✅ Day 13 — Security audit + hardening (2026-10-05)
 ## ⏳ Day 14 — Vercel deploy + Postgres (Neon)
 
+## ✅ Day 14 — Production deploy prep: Neon Postgres + Vercel config (2026-10-06)
+
+- [x] **Prisma → Postgres:** `provider = "postgresql"` in `prisma/schema.prisma` (the planned one-line Day-14 switch); `url = env("DATABASE_URL")` (Neon pooled) + `directUrl = env("DIRECT_URL")` (Neon direct, for `db push` only). Schema was already cross-compatible (cuid/Float/DateTime) — zero model changes.
+- [x] **Vercel build support:** `"postinstall": "prisma generate"` in package.json (client builds on Vercel automatically); old SQLite migration history archived to `prisma/migrations.sqlite-archive/` (reference only) — prod schema syncs via `prisma db push` + `prisma db seed`, documented in new `DEPLOY.md`.
+- [x] **`.env.example`:** Neon `DATABASE_URL`/`DIRECT_URL` placeholders, `AUTH_URL` for production callback URLs, Stripe trio marked optional (app deploys fine without — billing fails closed, `/billing` shows "not configured").
+- [x] **`DEPLOY.md` runbook:** exact 15–20 min steps — Neon project (ap-southeast-1 Singapore), `db push` + seed, Vercel import + env-var table, smoke-test checklist, Google OAuth callback + Stripe webhook follow-ups, ephemeral-uploads + in-memory-rate-limit notes.
+- [x] **Security audit adapted to Postgres (`npm test`, now 53 checks):** phases derive a sqlite-flavored copy of the CURRENT schema at runtime (no drift) — Phase 2 builds a throwaway client with custom output for ownership checks; Phase 3 swaps the generated client for the live-server boot and regenerates the production Postgres client in `finally` (verified by a new check). Added explicit `process.exit(0)` on success (dangling handles from the spawned server kept the loop alive).
+- [x] `.gitignore`: audit temp schemas (`prisma/.audit-tmp-*.prisma`); local `.env` now documents Neon placeholders (gitignored, no secrets).
+- [x] **Stripe keys not in chat by run time → deployed WITHOUT Stripe env wiring** per roadmap (payment endpoints stay dormant, fail closed).
+- [x] `npm run build` green (with Postgres client); `npm test` **53/53 green**; `prisma validate` clean.
+- [x] **Blocker for the actual go-live (needs Shahzad, ~15–20 min of taps):** Vercel account not connected to Muse (connect flow needs his tap) + Neon project not created yet. `DEPLOY.md` has the exact steps. Day-15 launch runs the smoke test once he's done steps 1–3.
+
 ## ⏳ Day 15 — Launch kit + final QA
 
 ## ✅ Day 13 — Security audit + hardening (2026-10-05)

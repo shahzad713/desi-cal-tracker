@@ -7,7 +7,11 @@
  *      CSP headers, dependency versions, no raw SQL, sanitizer wiring).
  *   2. OWNERSHIP — real Prisma queries against a throwaway SQLite DB using
  *      the EXACT where-clauses the server actions use (deleteMany/updateMany
- *      scoped by {id, userId}); a forged userId must affect 0 rows.
+ *      scoped by {id, userId}); a forged userId must affect 0 rows. The
+ *      production schema is Postgres (Day 14); this phase derives a
+ *      sqlite-flavored copy of it at runtime plus a throwaway client build,
+ *      so the audit never needs a live Postgres. The where-clause logic
+ *      under test is provider-agnostic.
  *   3. LIVE — boots `next start` (production build) on an isolated temp DB,
  *      then checks auth redirects, security headers, 404s, rate limits
  *      (429s), and robots/sitemap hygiene over real HTTP.
@@ -21,12 +25,42 @@
  */
 
 import { spawn, execSync, type ChildProcess } from "child_process";
-import { existsSync, readFileSync, rmSync } from "fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import net from "net";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Day 14: the production schema targets Postgres, but audit phases need a
+ * throwaway DB without assuming a reachable Postgres. This derives a
+ * sqlite-flavored copy of the CURRENT prisma/schema.prisma at runtime
+ * (generated from the real file, so it can never drift). When
+ * `clientOutputDir` is given the throwaway client is built there; otherwise
+ * the default node_modules/@prisma/client is used. Returns the temp schema
+ * file path. The where-clause logic under test is provider-agnostic.
+ */
+function writeSqliteVariantSchema(clientOutputDir?: string): string {
+  let s = readFileSync(join(ROOT, "prisma/schema.prisma"), "utf8");
+  if (!/provider\s*=\s*"postgresql"/.test(s)) {
+    throw new Error("expected postgresql provider in prisma/schema.prisma");
+  }
+  s = s.replace(
+    /datasource db\s*{[^}]*}/,
+    'datasource db {\n  provider = "sqlite"\n  url      = env("DATABASE_URL")\n}'
+  );
+  const generator = clientOutputDir
+    ? `generator client {\n  provider = "prisma-client-js"\n  output   = "${clientOutputDir}"\n}`
+    : 'generator client {\n  provider = "prisma-client-js"\n}';
+  s = s.replace(/generator client\s*{[^}]*}/, generator);
+  // NOTE: the temp schema MUST live under the repo (not /tmp) — Prisma
+  // infers the project root from the schema location, and from /tmp it
+  // tries to `npm i prisma` into /. This file is gitignored + deleted after.
+  const p = join(ROOT, "prisma", `.audit-tmp-${process.pid}${clientOutputDir ? "-phase2" : "-phase3"}.prisma`);
+  writeFileSync(p, s);
+  return p;
+}
 
 interface Check {
   name: string;
@@ -142,19 +176,22 @@ async function phase2() {
 
   const dbFile = `/tmp/desi-audit-${process.pid}.db`;
   const dbUrl = `file:${dbFile}`;
+  const testClientDir = `/tmp/desi-audit-client-${process.pid}`;
+  const testSchemaPath = writeSqliteVariantSchema(testClientDir);
   try {
-    execSync("npx prisma db push --accept-data-loss --skip-generate", {
+    execSync(`npx prisma generate --schema "${testSchemaPath}"`, { cwd: ROOT, stdio: "pipe" });
+    execSync(`npx prisma db push --schema "${testSchemaPath}" --accept-data-loss --skip-generate`, {
       cwd: ROOT,
       env: { ...process.env, DATABASE_URL: dbUrl },
       stdio: "pipe",
     });
   } catch (e) {
-    check("throwaway DB schema created", false, "prisma db push failed");
+    check("throwaway DB schema created", false, "prisma generate/db push failed");
     return;
   }
   check("throwaway DB schema created", true);
 
-  const { PrismaClient } = await import("@prisma/client");
+  const { PrismaClient } = await import(join(testClientDir, "index.js"));
   const prisma = new PrismaClient({ datasourceUrl: dbUrl });
   try {
     const userA = await prisma.user.create({ data: { email: "audit-a@example.com", name: "Audit A" } });
@@ -188,6 +225,8 @@ async function phase2() {
     await prisma.$disconnect();
     rmSync(dbFile, { force: true });
     rmSync(`${dbFile}-journal`, { force: true });
+    rmSync(testSchemaPath, { force: true });
+    rmSync(testClientDir, { force: true, recursive: true });
   }
 
   // Pure-function security helpers.
@@ -248,7 +287,14 @@ async function phase3() {
   const port = await freePort();
   const dbFile = `/tmp/desi-audit-live-${process.pid}.db`;
   const dbUrl = `file:${dbFile}`;
-  execSync("npx prisma db push --accept-data-loss --skip-generate", {
+  // Day 14: the production schema targets Postgres, but the live-server audit
+  // can't assume a reachable Postgres. Swap the GENERATED client to a sqlite
+  // build for the duration of this phase (default output =
+  // node_modules/@prisma/client), then regenerate the production client in
+  // `finally` so the repo is never left in a mixed state.
+  const liveSchemaPath = writeSqliteVariantSchema();
+  execSync(`npx prisma generate --schema "${liveSchemaPath}"`, { cwd: ROOT, stdio: "pipe" });
+  execSync(`npx prisma db push --schema "${liveSchemaPath}" --accept-data-loss --skip-generate`, {
     cwd: ROOT,
     env: { ...process.env, DATABASE_URL: dbUrl },
     stdio: "pipe",
@@ -377,6 +423,16 @@ async function phase3() {
     await new Promise((r) => setTimeout(r, 2000));
     rmSync(dbFile, { force: true });
     rmSync(`${dbFile}-journal`, { force: true });
+    rmSync(liveSchemaPath, { force: true });
+    // Restore the production (Postgres) client build no matter what happened
+    // above — leaving a sqlite client in node_modules would silently break
+    // the next real build/deploy.
+    try {
+      execSync("npx prisma generate", { cwd: ROOT, stdio: "pipe" });
+      check("production (Postgres) client restored after live phase", true);
+    } catch (e) {
+      check("production (Postgres) client restored after live phase", false, "prisma generate failed — run it manually");
+    }
   }
 }
 
@@ -395,6 +451,11 @@ async function main() {
     process.exit(1);
   }
   console.log("Security audit: ALL GREEN ✅");
+  // Explicit exit: the spawned next-server grandchild can survive SIGTERM as
+  // an orphan and the dynamically-imported throwaway client can leave the
+  // event loop alive after main() resolves. The verdict is already printed;
+  // hanging here would only stall CI/cron callers.
+  process.exit(0);
 }
 
 main().catch((err) => {
