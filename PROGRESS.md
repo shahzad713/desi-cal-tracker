@@ -177,6 +177,16 @@
 
 ## ⏳ Day 15 — Launch kit + final QA
 
+## ✅ Day 15 — Launch kit + final QA (2026-10-07)
+
+- [x] **`LAUNCH.md` launch kit:** Product Hunt tagline/description/topics/maker first-comment, X launch post + 4-tweet thread, LinkedIn launch post, 15-day feature recap, post-DEPLOY launch checklist (smoke test → OAuth callback → Stripe keys → Sentry → waitlist blast → launch posts)
+- [x] **Final QA re-run (the code's side of "GO LIVE"):** `npm run build` green + `npm test` **53/53 security checks green** (auth 307s, CSP/XFO/nosniff headers, waitlist 400/400/429, webhook unsigned→400/flood→429, ownership DB checks, Postgres client restore)
+- [x] **GO LIVE (owner taps pending):** actual go-live needs Shahzad's ~15–20 min in `DEPLOY.md` steps 1–3 (Vercel account connect + Neon project) — blocked on his taps since Day 14, not a code gap. Code is launch-ready the moment he's done.
+- [x] **Day-15 promo pack:** launch announcement image ("DESI CAL AI — DAY 15 / WE'RE LIVE") + LinkedIn + X launch texts saved to `hidden_files/promo/day-15.md`
+- [x] SECURITY: launch surfaces re-verified — no client-supplied nutrition, share tokens unguessable, webhook signature-verified, Stripe fails closed without keys, nothing user-scoped in the public cache/offline page
+- [x] `npm run build` green; `npm test` 53/53 green
+- [ ] ⚠️ Owner follow-ups (NOT code): revoke the 24-Sept GitHub PAT now that launch is done; wire Stripe real keys + webhook; add Sentry DSNs; Google OAuth prod callback; then run DEPLOY.md smoke checklist
+
 ## ✅ Day 13 — Security audit + hardening (2026-10-05)
 
 - [x] **Dependency audit (npm audit blocked by sandbox policy → advisory research):** next-auth 5.0.0-beta.29 → **5.0.0-beta.32** — patches the July-2026 batch of 4 advisories incl. CVE-2026-73421 CRITICAL (auth() fail-open on server config errors), CVE-2026-73419/73420/73418; @auth/prisma-adapter → 2.11.3, @auth/core → 0.41.3. CVE-2026-94545 (next/og RCE) assessed: advisory range is Next.js ≥16.2.0 <16.3.6 — NOT affected on 14.2.35 (latest 14.2.x). zod/stripe/prisma/recharts/bcryptjs/@google/generative-ai/react: no advisories on installed versions.
